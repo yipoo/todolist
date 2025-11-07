@@ -212,7 +212,7 @@ TodoList/
 
 1. **Clone the repository**
 ```bash
-git clone https://github.com/yourusername/TodoList.git
+git clone https://github.com/yipoo/todolist.git
 cd TodoList
 ```
 
@@ -383,7 +383,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - Website: [https://example.com](https://example.com)
 - Email: support@example.com
-- GitHub: [@yourusername](https://github.com/yourusername)
+- GitHub: [@yipoo](https://github.com/yipoo)
 
 ---
 
@@ -400,8 +400,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 For questions or suggestions, feel free to reach out:
 
 - 📧 Email: support@example.com
-- 🐛 Issues: [GitHub Issues](https://github.com/yourusername/TodoList/issues)
-- 💬 Discussions: [GitHub Discussions](https://github.com/yourusername/TodoList/discussions)
+- 🐛 Issues: [GitHub Issues](https://github.com/yipoo/TodoList/issues)
+- 💬 Discussions: [GitHub Discussions](https://github.com/yipoo/TodoList/discussions)
 
 ---
 

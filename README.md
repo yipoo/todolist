@@ -212,7 +212,7 @@ TodoList/
 
 1. **克隆仓库**
 ```bash
-git clone https://github.com/yourusername/TodoList.git
+git clone https://github.com/yipoo/todolist.git
 cd TodoList
 ```
 
@@ -383,7 +383,7 @@ try? context.save()
 
 - 网站: [https://example.com](https://example.com)
 - Email: support@example.com
-- GitHub: [@yourusername](https://github.com/yourusername)
+- GitHub: [@yipoo](https://github.com/yipoo)
 
 ---
 
@@ -400,8 +400,8 @@ try? context.save()
 如有问题或建议,欢迎通过以下方式联系:
 
 - 📧 Email: support@example.com
-- 🐛 Issues: [GitHub Issues](https://github.com/yourusername/TodoList/issues)
-- 💬 Discussions: [GitHub Discussions](https://github.com/yourusername/TodoList/discussions)
+- 🐛 Issues: [GitHub Issues](https://github.com/yipoo/TodoList/issues)
+- 💬 Discussions: [GitHub Discussions](https://github.com/yipoo/TodoList/discussions)
 
 ---
 
