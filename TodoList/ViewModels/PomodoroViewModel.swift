@@ -10,6 +10,7 @@
 import Foundation
 import SwiftData
 import Observation
+import UserNotifications
 
 @Observable
 @MainActor
@@ -258,12 +259,46 @@ final class PomodoroViewModel {
     /// 播放完成音效
     private func playCompletionSound() {
         guard settings.soundEnabled else { return }
-        // TODO: 实现音效播放
+        
+        // 根据会话类型播放不同的音效
+        let soundType: SoundManager.SoundType = currentSessionType == .work 
+            ? .pomodoroComplete 
+            : .breakComplete
+        
+        SoundManager.shared.play(soundType)
     }
 
     /// 发送完成通知
     private func sendCompletionNotification() {
-        // TODO: 实现本地通知
+        let content = UNMutableNotificationContent()
+        
+        // 根据会话类型设置通知内容
+        switch currentSessionType {
+        case .work:
+            content.title = "🍅 番茄钟完成！"
+            content.body = "工作时间结束，休息一下吧"
+        case .shortBreak:
+            content.title = "☕️ 短休息结束"
+            content.body = "准备好开始下一个番茄钟了吗？"
+        case .longBreak:
+            content.title = "🎉 长休息结束"
+            content.body = "你已经完成了一轮番茄钟，做得很棒！"
+        }
+        
+        content.sound = .default
+        
+        // 立即触发通知
+        let request = UNNotificationRequest(
+            identifier: UUID().uuidString,
+            content: content,
+            trigger: nil
+        )
+        
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("Failed to send notification: \(error)")
+            }
+        }
     }
 
 }

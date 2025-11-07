@@ -5,6 +5,9 @@
  */
 
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 extension View {
     // MARK: - 条件修饰符
@@ -31,8 +34,8 @@ extension View {
 
     // MARK: - 圆角
 
-    /// 指定边的圆角
-    func cornerRadius(_ radius: CGFloat, corners: UIRectCorner) -> some View {
+    /// 指定边的圆角（使用 SwiftUI 原生 API）
+    func cornerRadius(_ radius: CGFloat, corners: RectangleCorner) -> some View {
         clipShape(RoundedCorner(radius: radius, corners: corners))
     }
 
@@ -57,22 +60,24 @@ extension View {
     ) -> some View {
         self
             .padding(padding)
-            .background(Color(.systemBackground))
+//            .background(.systemBackground)
             .cornerRadius(cornerRadius)
             .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
 
     // MARK: - 键盘
 
-    /// 点击隐藏键盘
+    /// 点击隐藏键盘（使用 SwiftUI focused 状态）
     func hideKeyboardOnTap() -> some View {
         self.onTapGesture {
+            #if canImport(UIKit) && !os(watchOS)
             UIApplication.shared.sendAction(
                 #selector(UIResponder.resignFirstResponder),
                 to: nil,
                 from: nil,
                 for: nil
             )
+            #endif
         }
     }
 
@@ -109,20 +114,99 @@ extension View {
     }
 }
 
+// MARK: - 辅助类型
+
+/// 矩形角的枚举（SwiftUI 版本）
+struct RectangleCorner: OptionSet {
+    let rawValue: Int
+    
+    static let topLeft = RectangleCorner(rawValue: 1 << 0)
+    static let topRight = RectangleCorner(rawValue: 1 << 1)
+    static let bottomLeft = RectangleCorner(rawValue: 1 << 2)
+    static let bottomRight = RectangleCorner(rawValue: 1 << 3)
+    
+    static let allCorners: RectangleCorner = [.topLeft, .topRight, .bottomLeft, .bottomRight]
+    static let topCorners: RectangleCorner = [.topLeft, .topRight]
+    static let bottomCorners: RectangleCorner = [.bottomLeft, .bottomRight]
+    static let leftCorners: RectangleCorner = [.topLeft, .bottomLeft]
+    static let rightCorners: RectangleCorner = [.topRight, .bottomRight]
+}
+
 // MARK: - 辅助视图
 
-/// 自定义圆角形状
+/// 自定义圆角形状（纯 SwiftUI 实现）
 struct RoundedCorner: Shape {
     var radius: CGFloat = .infinity
-    var corners: UIRectCorner = .allCorners
+    var corners: RectangleCorner = .allCorners
 
     func path(in rect: CGRect) -> Path {
-        let path = UIBezierPath(
-            roundedRect: rect,
-            byRoundingCorners: corners,
-            cornerRadii: CGSize(width: radius, height: radius)
-        )
-        return Path(path.cgPath)
+        var path = Path()
+        
+        let topLeft = corners.contains(.topLeft) ? radius : 0
+        let topRight = corners.contains(.topRight) ? radius : 0
+        let bottomLeft = corners.contains(.bottomLeft) ? radius : 0
+        let bottomRight = corners.contains(.bottomRight) ? radius : 0
+        
+        path.move(to: CGPoint(x: rect.minX + topLeft, y: rect.minY))
+        
+        // 顶部边
+        path.addLine(to: CGPoint(x: rect.maxX - topRight, y: rect.minY))
+        
+        // 右上角
+        if topRight > 0 {
+            path.addArc(
+                center: CGPoint(x: rect.maxX - topRight, y: rect.minY + topRight),
+                radius: topRight,
+                startAngle: .degrees(-90),
+                endAngle: .degrees(0),
+                clockwise: false
+            )
+        }
+        
+        // 右侧边
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - bottomRight))
+        
+        // 右下角
+        if bottomRight > 0 {
+            path.addArc(
+                center: CGPoint(x: rect.maxX - bottomRight, y: rect.maxY - bottomRight),
+                radius: bottomRight,
+                startAngle: .degrees(0),
+                endAngle: .degrees(90),
+                clockwise: false
+            )
+        }
+        
+        // 底部边
+        path.addLine(to: CGPoint(x: rect.minX + bottomLeft, y: rect.maxY))
+        
+        // 左下角
+        if bottomLeft > 0 {
+            path.addArc(
+                center: CGPoint(x: rect.minX + bottomLeft, y: rect.maxY - bottomLeft),
+                radius: bottomLeft,
+                startAngle: .degrees(90),
+                endAngle: .degrees(180),
+                clockwise: false
+            )
+        }
+        
+        // 左侧边
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + topLeft))
+        
+        // 左上角
+        if topLeft > 0 {
+            path.addArc(
+                center: CGPoint(x: rect.minX + topLeft, y: rect.minY + topLeft),
+                radius: topLeft,
+                startAngle: .degrees(180),
+                endAngle: .degrees(270),
+                clockwise: false
+            )
+        }
+        
+        path.closeSubpath()
+        return path
     }
 }
 

@@ -14,79 +14,110 @@ struct SmallWidgetView: View {
     let entry: TodoWidgetEntry
 
     var body: some View {
-        ZStack {
-            // 背景渐变
-            LinearGradient(
-                colors: [Color.blue.opacity(0.6), Color.purple.opacity(0.6)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-
-            VStack(spacing: 8) {
-                // 标题
-                HStack {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.caption)
-                    Text("今日待办")
-                        .font(.caption)
-                        .fontWeight(.medium)
-                    Spacer()
-                }
-                .foregroundColor(.white)
-
+        VStack(spacing: 0) {
+            // 顶部标题区域
+            HStack(spacing: 6) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 14))
+                    .foregroundColor(.blue)
+                Text("今日待办")
+                    .font(.system(size: 13, weight: .semibold))
                 Spacer()
-
-                // 今日待办完成进度环
-                ZStack {
-                    Circle()
-                        .stroke(Color.white.opacity(0.3), lineWidth: 8)
-                        .frame(width: 70, height: 70)
-
-                    Circle()
-                        .trim(from: 0, to: todayCompletionRate)
-                        .stroke(
-                            Color.white,
-                            style: StrokeStyle(lineWidth: 8, lineCap: .round)
-                        )
-                        .frame(width: 70, height: 70)
-                        .rotationEffect(.degrees(-90))
-                        .animation(.easeInOut(duration: 0.5), value: todayCompletionRate)
-
-                    VStack(spacing: 2) {
-                        Text("\(todayCompletedCount)")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                        Text("/\(todayTotalCount)")
-                            .font(.caption2)
-                    }
-                    .foregroundColor(.white)
-                }
-
-                Spacer()
-
-                // 底部统计
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("已完成")
-                            .font(.caption2)
-                        Text("\(todayCompletedCount)")
-                            .font(.headline)
-                            .fontWeight(.bold)
-                    }
-
-                    Spacer()
-
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text("未完成")
-                            .font(.caption2)
-                        Text("\(todayUncompletedCount)")
-                            .font(.headline)
-                            .fontWeight(.bold)
-                    }
-                }
-                .foregroundColor(.white)
+                Text(formattedDate)
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
             }
-            .padding()
+            .padding(.horizontal, 16)
+            .padding(.top, 14)
+            .padding(.bottom, 8)
+
+            Spacer(minLength: 0)
+
+            // 中间进度环区域
+            ZStack {
+                Circle()
+                    .stroke(Color.gray.opacity(0.2), lineWidth: 10)
+                    .frame(width: 90, height: 90)
+
+                Circle()
+                    .trim(from: 0, to: todayCompletionRate)
+                    .stroke(
+                        progressGradient,
+                        style: StrokeStyle(lineWidth: 10, lineCap: .round)
+                    )
+                    .frame(width: 90, height: 90)
+                    .rotationEffect(.degrees(-90))
+                    .animation(.easeInOut(duration: 0.5), value: todayCompletionRate)
+
+                VStack(spacing: 0) {
+                    Text("\(todayCompletedCount)")
+                        .font(.system(size: 32, weight: .bold))
+                        .foregroundColor(.primary)
+                    Text("/\(todayTotalCount)")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.secondary)
+                }
+            }
+
+            Spacer(minLength: 0)
+
+            // 底部统计区域
+            HStack(spacing: 0) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("已完成")
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
+                    Text("\(todayCompletedCount)")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(completionColor)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Rectangle()
+                    .fill(Color.gray.opacity(0.2))
+                    .frame(width: 1, height: 30)
+
+                VStack(alignment: .trailing, spacing: 3) {
+                    Text("未完成")
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
+                    Text("\(todayUncompletedCount)")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(.orange)
+                }
+                .frame(maxWidth: .infinity, alignment: .trailing)
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 14)
+        }
+    }
+
+    // MARK: - 辅助属性
+
+    private var formattedDate: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "M/d"
+        return formatter.string(from: entry.date)
+    }
+
+    /// 进度环渐变色
+    private var progressGradient: AngularGradient {
+        AngularGradient(
+            gradient: Gradient(colors: [.blue, .purple, .blue]),
+            center: .center,
+            startAngle: .degrees(0),
+            endAngle: .degrees(360)
+        )
+    }
+
+    /// 完成数量的颜色
+    private var completionColor: Color {
+        if todayCompletedCount >= todayTotalCount {
+            return .green
+        } else if todayCompletedCount > 0 {
+            return .blue
+        } else {
+            return .gray
         }
     }
 

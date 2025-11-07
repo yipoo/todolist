@@ -35,6 +35,11 @@ struct TodoListView: View {
 
     // MARK: - 计算属性
 
+    /// 是否有激活的筛选或排序
+    private var hasActiveFilterOrSort: Bool {
+        todoViewModel.currentFilter != .all || todoViewModel.currentSort != .createdAt
+    }
+
     /// 按分类分组的 todos
     private var groupedTodos: [(category: Category?, todos: [TodoItem])] {
         let todos = todoViewModel.filteredTodos
@@ -185,6 +190,15 @@ struct TodoListView: View {
     /// 列表内容
     private var listContent: some View {
         List {
+            // 筛选状态栏
+            if hasActiveFilterOrSort {
+                Section {
+                    filterStatusBar
+                }
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
+            }
+
             ForEach(Array(groupedTodos.enumerated()), id: \.offset) { groupIndex, group in
                 Section {
                     ForEach(Array(group.todos.enumerated()), id: \.element.id) { localIndex, todo in
@@ -261,6 +275,86 @@ struct TodoListView: View {
     /// 计算 todo 在全局 filteredTodos 中的索引
     private func calculateGlobalIndex(for todo: TodoItem) -> Int {
         todoViewModel.filteredTodos.firstIndex(where: { $0.id == todo.id }) ?? 0
+    }
+
+    /// 筛选状态栏
+    private var filterStatusBar: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // 背景容器
+            VStack(alignment: .leading, spacing: 8) {
+                // 标题行
+                HStack {
+                    Image(systemName: "line.3.horizontal.decrease.circle.fill")
+                        .font(.subheadline)
+                        .foregroundColor(.blue)
+                    Text("当前筛选")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                }
+
+                // 筛选和排序标签
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        // 筛选标签
+                        if todoViewModel.currentFilter != .all {
+                            FilterStatusChip(
+                                icon: todoViewModel.currentFilter.icon,
+                                title: todoViewModel.currentFilter.displayName,
+                                onRemove: {
+                                    withAnimation {
+                                        todoViewModel.updateFilter(.all)
+                                    }
+                                }
+                            )
+                        }
+
+                        // 排序标签
+                        if todoViewModel.currentSort != .createdAt {
+                            FilterStatusChip(
+                                icon: "arrow.up.arrow.down",
+                                title: todoViewModel.currentSort.displayName,
+                                onRemove: {
+                                    withAnimation {
+                                        todoViewModel.updateSort(.createdAt)
+                                    }
+                                }
+                            )
+                        }
+
+                        // 清除全部按钮
+                        Button(action: {
+                            withAnimation {
+                                todoViewModel.updateFilter(.all)
+                                todoViewModel.updateSort(.createdAt)
+                            }
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.caption)
+                                Text("清除全部")
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                            }
+                            .foregroundColor(.red)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color.red.opacity(0.1))
+                            .cornerRadius(12)
+                        }
+                    }
+                    .padding(.horizontal, 2)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(Color(.systemBackground))
+            .cornerRadius(12)
+            .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+        }
     }
 
     /// 筛选栏
@@ -402,6 +496,33 @@ struct FilterChip: View {
                 .foregroundColor(isSelected ? .white : .primary)
                 .cornerRadius(16)
         }
+    }
+}
+
+/// 筛选状态标签（可关闭）
+struct FilterStatusChip: View {
+    let icon: String
+    let title: String
+    let onRemove: () -> Void
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.caption)
+            Text(title)
+                .font(.caption)
+                .fontWeight(.medium)
+            Button(action: onRemove) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .foregroundColor(.blue)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(Color.blue.opacity(0.1))
+        .cornerRadius(12)
     }
 }
 

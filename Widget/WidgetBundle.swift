@@ -13,5 +13,8 @@ struct TodoListWidgetBundle: WidgetBundle {
     var body: some Widget {
         // 主 Widget（待办事项）
         TodoListStaticWidget()
+
+        // 快速添加 Widget（iOS 17+ Interactive Widget）
+        QuickAddWidget()
     }
 }
