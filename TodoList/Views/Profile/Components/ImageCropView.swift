@@ -27,6 +27,13 @@ struct ImageCropView: View {
     // MARK: - Body
 
     var body: some View {
+        GeometryReader { geometry in
+            bodyContent(screenWidth: geometry.size.width)
+        }
+    }
+
+    @ViewBuilder
+    private func bodyContent(screenWidth: CGFloat) -> some View {
         NavigationStack {
             ZStack {
                 Color.black.ignoresSafeArea()
@@ -90,7 +97,7 @@ struct ImageCropView: View {
                     Spacer()
 
                     // 控制栏
-                    controlBar
+                    controlBar(screenWidth: screenWidth)
                         .padding(.bottom, 40)
                 }
             }
@@ -106,7 +113,7 @@ struct ImageCropView: View {
 
                 ToolbarItem(placement: .confirmationAction) {
                     Button("完成") {
-                        cropImage()
+                        cropImage(screenWidth: screenWidth)
                         dismiss()
                     }
                     .foregroundColor(.white)
@@ -118,7 +125,7 @@ struct ImageCropView: View {
     // MARK: - 子视图
 
     /// 控制栏
-    private var controlBar: some View {
+    private func controlBar(screenWidth: CGFloat) -> some View {
         VStack(spacing: 20) {
             // 缩放滑块
             HStack(spacing: 16) {
@@ -163,7 +170,9 @@ struct ImageCropView: View {
                 }
 
                 // 适应按钮
-                Button(action: fitImage) {
+                Button(action: {
+                    fitImage(screenWidth: screenWidth)
+                }) {
                     VStack(spacing: 4) {
                         Image(systemName: "arrow.up.left.and.arrow.down.right")
                             .font(.title3)
@@ -183,38 +192,69 @@ struct ImageCropView: View {
     // MARK: - 方法
 
     /// 裁剪图片
-    private func cropImage() {
-        let renderer = UIGraphicsImageRenderer(size: CGSize(width: cropSize, height: cropSize))
+    private func cropImage(screenWidth: CGFloat) {
+        let imageSize = image.size
 
-        let croppedUIImage = renderer.image { context in
-            // 创建圆形路径
-            let circlePath = UIBezierPath(
-                ovalIn: CGRect(x: 0, y: 0, width: cropSize, height: cropSize)
-            )
-            circlePath.addClip()
+        // 计算图片在视图中的基础显示尺寸（scaledToFit）
+        let imageAspect = imageSize.width / imageSize.height
+        let baseWidth: CGFloat
+        let baseHeight: CGFloat
 
-            // 计算图片绘制位置和大小
-            let imageSize = image.size
-            let scaleFactor = scale
-            let scaledWidth = imageSize.width * scaleFactor
-            let scaledHeight = imageSize.height * scaleFactor
-
-            // 计算居中位置
-            let drawX = (cropSize - scaledWidth) / 2 + offset.width
-            let drawY = (cropSize - scaledHeight) / 2 + offset.height
-
-            let drawRect = CGRect(
-                x: drawX,
-                y: drawY,
-                width: scaledWidth,
-                height: scaledHeight
-            )
-
-            // 绘制图片
-            image.draw(in: drawRect)
+        if imageAspect > 1 {
+            // 横图：宽度匹配屏幕宽度
+            baseWidth = screenWidth
+            baseHeight = screenWidth / imageAspect
+        } else {
+            // 竖图：按比例缩放
+            baseHeight = screenWidth
+            baseWidth = screenWidth * imageAspect
         }
 
-        croppedImage = croppedUIImage
+        // 应用用户的缩放系数
+        let viewWidth = baseWidth * scale
+        let viewHeight = baseHeight * scale
+
+        // 计算图片在视图中的位置（考虑用户拖动的偏移）
+        let viewX = (screenWidth - viewWidth) / 2 + offset.width
+        let viewY = (screenWidth - viewHeight) / 2 + offset.height
+
+        // 计算裁剪区域在视图中的位置
+        let cropX = (screenWidth - cropSize) / 2
+        let cropY = (screenWidth - cropSize) / 2
+
+        // 计算裁剪区域相对于图片的位置和大小（在原始图片坐标系中）
+        let scale = imageSize.width / viewWidth
+        let cropRect = CGRect(
+            x: (cropX - viewX) * scale,
+            y: (cropY - viewY) * scale,
+            width: cropSize * scale,
+            height: cropSize * scale
+        )
+
+        // 使用 CGImage 进行精确裁剪
+        guard let cgImage = image.cgImage,
+              let croppedCGImage = cgImage.cropping(to: cropRect) else {
+            return
+        }
+
+        // 转换为 UIImage 并调整大小到目标尺寸
+        let croppedUIImage = UIImage(cgImage: croppedCGImage, scale: image.scale, orientation: image.imageOrientation)
+
+        // 将裁剪后的图片调整到最终尺寸 (cropSize x cropSize)
+        let finalSize = CGSize(width: cropSize, height: cropSize)
+        UIGraphicsBeginImageContextWithOptions(finalSize, false, 1.0)
+        defer { UIGraphicsEndImageContext() }
+
+        // 创建圆形裁剪路径
+        let circlePath = UIBezierPath(ovalIn: CGRect(origin: .zero, size: finalSize))
+        circlePath.addClip()
+
+        // 绘制图片
+        croppedUIImage.draw(in: CGRect(origin: .zero, size: finalSize))
+
+        if let finalImage = UIGraphicsGetImageFromCurrentImageContext() {
+            croppedImage = finalImage
+        }
     }
 
     /// 重置变换
@@ -236,12 +276,21 @@ struct ImageCropView: View {
     }
 
     /// 适应图片
-    private func fitImage() {
+    private func fitImage(screenWidth: CGFloat) {
         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
             // 计算合适的缩放比例
             let imageSize = image.size
-            let minDimension = min(imageSize.width, imageSize.height)
-            scale = cropSize / minDimension * 1.1 // 稍微放大一点
+            let imageAspect = imageSize.width / imageSize.height
+            let baseWidth: CGFloat
+
+            if imageAspect > 1 {
+                baseWidth = screenWidth
+            } else {
+                baseWidth = screenWidth * imageAspect
+            }
+
+            // 计算需要的缩放比例，让图片刚好填充裁剪区域
+            scale = (cropSize / baseWidth) * 1.1 // 稍微放大一点
             lastScale = scale
             offset = .zero
             lastOffset = .zero

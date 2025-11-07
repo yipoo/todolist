@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- 蓝紫渐变 -->
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#007AFF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#5E5CE6;stop-opacity:1" />
+    </linearGradient>
+
+    <!-- 阴影 -->
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="8" stdDeviation="16" flood-opacity="0.15"/>
+    </filter>
+  </defs>
+
+  <!-- 圆角背景 -->
+  <rect width="1024" height="1024" rx="226" fill="url(#bgGradient)"/>
+
+  <!-- 主要内容组 -->
+  <g transform="translate(512, 512)">
+    <!-- 列表背景卡片 -->
+    <rect x="-280" y="-280" width="560" height="560" rx="48" fill="white" opacity="0.15" filter="url(#shadow)"/>
+
+    <!-- 顶部列表项 (未完成) -->
+    <g transform="translate(0, -180)">
+      <circle cx="-180" cy="0" r="24" fill="white" opacity="0.3" stroke="white" stroke-width="4"/>
+      <rect x="-120" y="-8" width="280" height="16" rx="8" fill="white" opacity="0.3"/>
+    </g>
+
+    <!-- 中间列表项 (已完成 - 主要焦点) -->
+    <g transform="translate(0, -40)">
+      <!-- 完成的圆形 -->
+      <circle cx="-180" cy="0" r="32" fill="white"/>
+      <!-- 对勾 -->
+      <path d="M -192 0 L -178 14 L -168 -6"
+            stroke="#5E5CE6"
+            stroke-width="8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            fill="none"/>
+      <!-- 文字线条 -->
+      <rect x="-120" y="-10" width="320" height="20" rx="10" fill="white"/>
+    </g>
+
+    <!-- 底部列表项 (未完成) -->
+    <g transform="translate(0, 100)">
+      <circle cx="-180" cy="0" r="24" fill="white" opacity="0.3" stroke="white" stroke-width="4"/>
+      <rect x="-120" y="-8" width="240" height="16" rx="8" fill="white" opacity="0.3"/>
+    </g>
+
+    <!-- 装饰性小圆点 -->
+    <circle cx="220" cy="-220" r="12" fill="white" opacity="0.2"/>
+    <circle cx="240" cy="200" r="16" fill="white" opacity="0.15"/>
+    <circle cx="-240" cy="220" r="10" fill="white" opacity="0.2"/>
+  </g>
+</svg>

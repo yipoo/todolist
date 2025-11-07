@@ -115,6 +115,7 @@ final class TodoViewModel {
 
     private let dataManager = DataManager.shared
     private let authViewModel: AuthViewModel
+    private let notificationManager = NotificationManager.shared
 
     // MARK: - 初始化
 
@@ -140,7 +141,24 @@ final class TodoViewModel {
             sortBy: currentSort
         )
 
+        print("📋 加载待办列表: 共 \(todos.count) 项")
+        print("   - 筛选条件: \(currentFilter.displayName)")
+        print("   - 排序方式: \(currentSort.displayName)")
+
         isLoading = false
+
+        // 在后台同步所有待办的通知
+        Task {
+            await syncNotifications()
+        }
+    }
+
+    /// 同步所有待办的通知
+    private func syncNotifications() async {
+        // 为所有未完成且有截止日期的待办设置通知
+        for todo in todos where !todo.isCompleted && todo.dueDate != nil {
+            await notificationManager.scheduleNotification(for: todo)
+        }
     }
 
     /// 刷新列表
@@ -187,6 +205,9 @@ final class TodoViewModel {
 
             try dataManager.createTodo(todo)
 
+            // 为新创建的待办设置通知
+            await notificationManager.scheduleNotification(for: todo)
+
             // 重新加载列表
             loadTodos()
 
@@ -206,6 +227,9 @@ final class TodoViewModel {
 
         do {
             try dataManager.updateTodo(todo)
+
+            // 更新通知（如果已完成则取消，否则重新调度）
+            await notificationManager.updateNotification(for: todo)
 
             // 重新加载列表
             loadTodos()
@@ -230,18 +254,29 @@ final class TodoViewModel {
         clearMessages()
         isLoading = true
 
+        print("🔵 准备删除 Todo: \(todo.title), ID: \(todo.id)")
+
         do {
+            // 取消待办的通知
+            await notificationManager.cancelNotification(for: todo)
+
             try dataManager.deleteTodo(todo)
 
-            // 重新加载列表
+            // 从本地数组中移除（立即更新 UI）
+            todos.removeAll { $0.id == todo.id }
+
+            // 重新加载列表以确保同步
             loadTodos()
 
             successMessage = "删除成功"
             isLoading = false
 
+            print("✅ 删除完成，当前待办数: \(todos.count)")
+
         } catch {
             errorMessage = "删除失败：\(error.localizedDescription)"
             isLoading = false
+            print("❌ 删除失败: \(error.localizedDescription)")
         }
     }
 

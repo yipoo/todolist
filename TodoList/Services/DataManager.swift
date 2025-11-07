@@ -64,6 +64,7 @@ final class DataManager {
         // 使用 groupContainer 参数指定 App Group
         let configuration = ModelConfiguration(
             schema: schema,
+            isStoredInMemoryOnly: false, // 确保数据持久化到磁盘
             groupContainer: .identifier(DataManager.appGroupIdentifier)
         )
 
@@ -72,6 +73,10 @@ final class DataManager {
                 for: schema,
                 configurations: [configuration]
             )
+
+            // 配置主 context 的自动保存
+            container.mainContext.autosaveEnabled = true
+
             print("✅ SwiftData 初始化成功（使用 App Group 共享容器）")
         } catch {
             fatalError("❌ 无法创建 ModelContainer: \(error)")
@@ -166,7 +171,12 @@ final class DataManager {
     /// 删除待办事项
     func deleteTodo(_ todo: TodoItem) throws {
         context.delete(todo)
-        try context.save()
+
+        // 确保保存到持久化存储
+        if context.hasChanges {
+            try context.save()
+            print("🗑️ 删除 Todo: \(todo.title), ID: \(todo.id)")
+        }
     }
 
     /// 获取用户的所有待办（带筛选）

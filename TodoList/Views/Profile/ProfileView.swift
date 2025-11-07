@@ -24,6 +24,7 @@ struct ProfileView: View {
     @State private var showLogoutAlert = false
     @State private var showAvatarPicker = false
     @State private var avatarImage: UIImage?
+    @State private var pendingAvatarImage: UIImage? // 等待保存的新头像
     @State private var showToast = false
     
     // MARK: - 初始化
@@ -86,15 +87,19 @@ struct ProfileView: View {
                 Task {
                     await loadData()
                 }
+                // 加载当前头像
                 avatarImage = viewModel.getAvatarImage()
             }
             .sheet(isPresented: $showAvatarPicker) {
-                AvatarPickerSheet(selectedImage: $avatarImage)
+                AvatarPickerSheet(selectedImage: $pendingAvatarImage)
             }
-            .onChange(of: avatarImage) { _, newImage in
+            .onChange(of: pendingAvatarImage) { _, newImage in
+                // 只有当有新头像选择时才更新
                 if let image = newImage {
+                    avatarImage = image // 立即更新显示
                     Task {
                         await viewModel.updateAvatar(image)
+                        pendingAvatarImage = nil // 清除临时状态
                     }
                 }
             }
@@ -394,7 +399,7 @@ struct SettingRow: View {
     let color: Color
     var badge: String? = nil
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: 16) {
@@ -403,17 +408,17 @@ struct SettingRow: View {
                     RoundedRectangle(cornerRadius: 8)
                         .fill(color)
                         .frame(width: 40, height: 40)
-                    
+
                     Image(systemName: icon)
                         .foregroundColor(.white)
                 }
-                
+
                 // Title
                 Text(title)
                     .foregroundColor(.primary)
-                
+
                 Spacer()
-                
+
                 // Badge
                 if let badge = badge {
                     Text(badge)
@@ -424,13 +429,14 @@ struct SettingRow: View {
                         .background(Color.secondary.opacity(0.2))
                         .cornerRadius(8)
                 }
-                
+
                 // Arrow
                 Image(systemName: "chevron.right")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
             .padding()
+            .contentShape(Rectangle()) // 确保整行都可点击
         }
         .buttonStyle(PlainButtonStyle())
     }

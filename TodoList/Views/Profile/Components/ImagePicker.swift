@@ -89,12 +89,17 @@ struct AvatarPickerSheet: View {
     @State private var showPhotoLibrary = false
     @State private var tempImage: UIImage?
     @State private var showCropView = false
+    @State private var currentPreview: UIImage? // 当前预览的图片
+    @State private var showPermissionAlert = false
+    @State private var permissionAlertMessage = ""
+
+    private let permissionManager = PermissionManager.shared
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 20) {
                 // 当前头像预览
-                if let image = selectedImage {
+                if let image = currentPreview {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFill()
@@ -122,7 +127,9 @@ struct AvatarPickerSheet: View {
                 VStack(spacing: 16) {
                     // 拍照
                     Button(action: {
-                        showCamera = true
+                        Task {
+                            await requestCameraPermission()
+                        }
                     }) {
                         HStack {
                             Image(systemName: "camera.fill")
@@ -142,7 +149,9 @@ struct AvatarPickerSheet: View {
 
                     // 从相册选择
                     Button(action: {
-                        showPhotoLibrary = true
+                        Task {
+                            await requestPhotoLibraryPermission()
+                        }
                     }) {
                         HStack {
                             Image(systemName: "photo.on.rectangle")
@@ -161,9 +170,10 @@ struct AvatarPickerSheet: View {
                     .buttonStyle(PlainButtonStyle())
 
                     // 删除头像（如果已有头像）
-                    if selectedImage != nil {
+                    if currentPreview != nil {
                         Button(action: {
-                            selectedImage = nil
+                            currentPreview = nil
+                            selectedImage = UIImage() // 使用空图片标记删除
                             dismiss()
                         }) {
                             HStack {
@@ -198,9 +208,10 @@ struct AvatarPickerSheet: View {
                     }
                 }
 
-                if selectedImage != nil {
+                if currentPreview != nil {
                     ToolbarItem(placement: .confirmationAction) {
                         Button("完成") {
+                            selectedImage = currentPreview
                             dismiss()
                         }
                     }
@@ -221,9 +232,49 @@ struct AvatarPickerSheet: View {
             }
             .fullScreenCover(isPresented: $showCropView) {
                 if let image = tempImage {
-                    ImageCropView(image: image, croppedImage: $selectedImage)
+                    ImageCropView(image: image, croppedImage: $currentPreview)
                 }
             }
+            .onAppear {
+                // 初始化时不设置 currentPreview，保持为 nil
+                // 这样用户第一次打开时不会显示旧头像
+            }
+            .alert("权限被拒绝", isPresented: $showPermissionAlert) {
+                Button("前往设置") {
+                    permissionManager.openSettings()
+                }
+                Button("取消", role: .cancel) {}
+            } message: {
+                Text(permissionAlertMessage)
+            }
+        }
+    }
+
+    // MARK: - 权限请求方法
+
+    /// 请求相机权限
+    private func requestCameraPermission() async {
+        let granted = await permissionManager.requestCameraPermission()
+
+        if granted {
+            showCamera = true
+        } else {
+            let alert = permissionManager.showPermissionDeniedAlert(for: "相机")
+            permissionAlertMessage = alert.message
+            showPermissionAlert = true
+        }
+    }
+
+    /// 请求相册权限
+    private func requestPhotoLibraryPermission() async {
+        let granted = await permissionManager.requestPhotoLibraryPermission()
+
+        if granted {
+            showPhotoLibrary = true
+        } else {
+            let alert = permissionManager.showPermissionDeniedAlert(for: "相册")
+            permissionAlertMessage = alert.message
+            showPermissionAlert = true
         }
     }
 }

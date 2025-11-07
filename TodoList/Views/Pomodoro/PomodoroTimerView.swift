@@ -80,14 +80,6 @@ struct PomodoroTimerView: View {
         .onChange(of: selectedPresetIndex) { _, newIndex in
             updateDuration(PomodoroPreset.presets[newIndex].duration)
         }
-        .background(
-            // 点击空白处的手势
-            Color.clear
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    // 空白处不做任何事
-                }
-        )
     }
 
     /// 预设页面内容
@@ -138,6 +130,14 @@ struct PomodoroTimerView: View {
             bottomInfo
         }
         .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            // 点击空白处切换TabBar显示
+            withAnimation {
+                showTabBar.toggle()
+            }
+        }
     }
 
     /// 运行中视图
