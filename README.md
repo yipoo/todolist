@@ -72,16 +72,71 @@
 
 ## 📸 应用截图
 
-> 注：截图占位,实际使用时请替换为真实截图
+<div align="center">
 
-```
-┌─────────────┬─────────────┬─────────────┬─────────────┐
-│  待办列表   │   分类管理   │   番茄钟    │   统计分析   │
-│             │             │             │             │
-│  [TODO]     │  [CATEGORY] │  [POMODORO] │ [STATISTICS]│
-│             │             │             │             │
-└─────────────┴─────────────┴─────────────┴─────────────┘
-```
+### 主要功能
+
+<table>
+  <tr>
+    <td align="center">
+      <img src="docs/images/IMG_1553.PNG" width="200"/>
+      <br/>
+      <sub><b>待办列表</b></sub>
+    </td>
+    <td align="center">
+      <img src="docs/images/IMG_1554.PNG" width="200"/>
+      <br/>
+      <sub><b>番茄时钟</b></sub>
+    </td>
+    <td align="center">
+      <img src="docs/images/IMG_1555.PNG" width="200"/>
+      <br/>
+      <sub><b>数据统计</b></sub>
+    </td>
+    <td align="center">
+      <img src="docs/images/IMG_1556.PNG" width="200"/>
+      <br/>
+      <sub><b>我的[dark 模式]</b></sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/images/IMG_1557.PNG" width="200"/>
+      <br/>
+      <sub><b>偏好设置</b></sub>
+    </td>
+    <td align="center">
+      <img src="docs/images/IMG_1558.PNG" width="200"/>
+      <br/>
+      <sub><b>我的[light 模式]</b></sub>
+    </td>
+    <td align="center">
+      <img src="docs/images/IMG_1559.PNG" width="200"/>
+      <br/>
+      <sub><b>待办列表[light]</b></sub>
+    </td>
+    <td align="center">
+      <img src="docs/images/IMG_1560.PNG" width="200"/>
+      <br/>
+      <sub><b>添加待办[light]</b></sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/images/IMG_1561.PNG" width="200"/>
+      <br/>
+      <sub><b>待办详情</b></sub>
+    </td>
+    <td align="center">
+      <img src="docs/images/IMG_1562.PNG" width="200"/>
+      <br/>
+      <sub><b>数据统计</b></sub>
+    </td>
+    <td colspan="2"></td>
+  </tr>
+</table>
+
+</div>
 
 ---
 

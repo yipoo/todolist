@@ -72,16 +72,71 @@ English | [简体中文](./README.md)
 
 ## 📸 Screenshots
 
-> Note: Screenshot placeholders - replace with actual screenshots when available
+<div align="center">
 
-```
-┌─────────────┬─────────────┬─────────────┬─────────────┐
-│  Todo List  │  Categories │  Pomodoro   │  Statistics │
-│             │             │             │             │
-│  [TODO]     │  [CATEGORY] │  [POMODORO] │ [STATISTICS]│
-│             │             │             │             │
-└─────────────┴─────────────┴─────────────┴─────────────┘
-```
+### Main Features
+
+<table>
+  <tr>
+    <td align="center">
+      <img src="docs/images/IMG_1553.PNG" width="200"/>
+      <br/>
+      <sub><b>Todo List</b></sub>
+    </td>
+    <td align="center">
+      <img src="docs/images/IMG_1554.PNG" width="200"/>
+      <br/>
+      <sub><b>Promodoro</b></sub>
+    </td>
+    <td align="center">
+      <img src="docs/images/IMG_1555.PNG" width="200"/>
+      <br/>
+      <sub><b>Statistics</b></sub>
+    </td>
+    <td align="center">
+      <img src="docs/images/IMG_1556.PNG" width="200"/>
+      <br/>
+      <sub><b>Settings</b></sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/images/IMG_1557.PNG" width="200"/>
+      <br/>
+      <sub><b>Settings</b></sub>
+    </td>
+    <td align="center">
+      <img src="docs/images/IMG_1558.PNG" width="200"/>
+      <br/>
+      <sub><b>Settings[light]</b></sub>
+    </td>
+    <td align="center">
+      <img src="docs/images/IMG_1559.PNG" width="200"/>
+      <br/>
+      <sub><b>TodoList</b></sub>
+    </td>
+    <td align="center">
+      <img src="docs/images/IMG_1560.PNG" width="200"/>
+      <br/>
+      <sub><b>add new todo</b></sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/images/IMG_1561.PNG" width="200"/>
+      <br/>
+      <sub><b>todo detail</b></sub>
+    </td>
+    <td align="center">
+      <img src="docs/images/IMG_1562.PNG" width="200"/>
+      <br/>
+      <sub><b>Statistics</b></sub>
+    </td>
+    <td colspan="2"></td>
+  </tr>
+</table>
+
+</div>
 
 ---
 
