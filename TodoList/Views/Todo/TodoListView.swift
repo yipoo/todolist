@@ -25,6 +25,17 @@ struct TodoListView: View {
     @State private var selectedTodoItem: SelectedTodoItem?
     @State private var showToast = false
     @State private var groupByCategory = false // 是否按分类分组
+    @State private var speechRecognizer = SpeechRecognitionManager() // 语音识别管理器
+    @State private var micButtonPosition: CGPoint? = nil // 麦克风按钮的位置（nil = 使用默认位置）
+    @State private var isDraggingMic = false // 是否正在拖拽麦克风
+    @FocusState private var isQuickAddFocused: Bool // QuickAdd输入框焦点状态
+    
+    // 左滑操作相关状态
+    @State private var todoToDelete: TodoItem? = nil // 待删除的 todo
+    @State private var showDeleteConfirm = false // 显示删除确认对话框
+    @State private var todoForSubtask: TodoItem? = nil // 要添加子任务的 todo
+    @State private var showAddSubtaskSheet = false // 显示添加子任务弹窗
+    @State private var newSubtaskTitle = "" // 新子任务标题
 
     // MARK: - 初始化
 
@@ -82,15 +93,74 @@ struct TodoListView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                if todoViewModel.isLoading && todoViewModel.todos.isEmpty {
-                    // 加载中
-                    loadingView
-                } else if todoViewModel.filteredTodos.isEmpty {
-                    // 空状态
-                    emptyView
-                } else {
-                    // 列表内容
-                    listContent
+                VStack(spacing: 0) {
+                    // 主内容区域
+                    ZStack {
+                        if todoViewModel.isLoading && todoViewModel.todos.isEmpty {
+                            // 加载中
+                            loadingView
+                        } else if todoViewModel.filteredTodos.isEmpty {
+                            // 空状态
+                            emptyView
+                        } else {
+                            // 列表内容
+                            listContent
+                        }
+                    }
+                    .simultaneousGesture(
+                        // 使用 simultaneousGesture 确保不会阻止列表滚动
+                        TapGesture().onEnded { _ in
+                            // 点击列表区域时隐藏键盘
+                            isQuickAddFocused = false
+                        }
+                    )
+
+                    // 底部快捷添加入口
+                    QuickAddTodoView(
+                        todoViewModel: todoViewModel,
+                        authViewModel: authViewModel,
+                        speechRecognizer: $speechRecognizer,
+                        isTextFieldFocused: $isQuickAddFocused,
+                        onSave: {
+                            // 保存成功后的回调
+                        }
+                    )
+                }
+
+                // 悬浮麦克风按钮（可拖拽，默认右下角）
+                GeometryReader { geometry in
+                    let defaultPosition = CGPoint(
+                        x: geometry.size.width - 40,
+                        y: geometry.size.height - 160
+                    )
+                    let currentPosition = micButtonPosition ?? defaultPosition
+
+                    floatingMicButton
+                        .position(currentPosition)
+                        .gesture(
+                            DragGesture()
+                                .onChanged { value in
+                                    isDraggingMic = true
+                                    // 实时更新位置
+                                    let newPosition = CGPoint(
+                                        x: clampPosition(
+                                            value: value.location.x,
+                                            min: 40,
+                                            max: geometry.size.width - 40
+                                        ),
+                                        y: clampPosition(
+                                            value: value.location.y,
+                                            min: 60,
+                                            max: geometry.size.height - 40
+                                        )
+                                    )
+                                    micButtonPosition = newPosition
+                                }
+                                .onEnded { _ in
+                                    isDraggingMic = false
+                                    // 位置已经在 onChanged 中设置好了
+                                }
+                        )
                 }
             }
             .navigationTitle("待办")
@@ -132,6 +202,48 @@ struct TodoListView: View {
                 todoViewModel.loadTodos()
                 categoryViewModel.loadCategories()
             }
+            // 删除确认对话框
+            .alert("确定删除？", isPresented: $showDeleteConfirm) {
+                Button("删除", role: .destructive) {
+                    if let todo = todoToDelete {
+                        Task {
+                            await todoViewModel.deleteTodo(todo)
+                            todoToDelete = nil
+                        }
+                    }
+                }
+                Button("取消", role: .cancel) {
+                    todoToDelete = nil
+                }
+            } message: {
+                Text("删除后无法恢复")
+            }
+            // 添加子任务弹窗
+            .sheet(isPresented: $showAddSubtaskSheet) {
+                if let todo = todoForSubtask {
+                    AddSubtaskSheet(
+                        todoTitle: todo.title,
+                        newSubtaskTitle: $newSubtaskTitle,
+                        onAdd: {
+                            let trimmed = newSubtaskTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+                            if !trimmed.isEmpty {
+                                Task {
+                                    await todoViewModel.addSubtask(to: todo, title: trimmed)
+                                }
+                            }
+                            showAddSubtaskSheet = false
+                            newSubtaskTitle = ""
+                            todoForSubtask = nil
+                        },
+                        onCancel: {
+                            showAddSubtaskSheet = false
+                            newSubtaskTitle = ""
+                            todoForSubtask = nil
+                        }
+                    )
+                    .presentationDetents([.height(300)])
+                }
+            }
         }
     }
 
@@ -145,6 +257,11 @@ struct TodoListView: View {
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .padding(.top)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            isQuickAddFocused = false
         }
     }
 
@@ -185,6 +302,11 @@ struct TodoListView: View {
             }
         }
         .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            isQuickAddFocused = false
+        }
     }
 
     /// 列表内容
@@ -213,6 +335,7 @@ struct TodoListView: View {
                                 }
                             },
                             onDelete: {
+                                // 通过 ViewModel 删除
                                 Task {
                                     await todoViewModel.deleteTodo(todo)
                                 }
@@ -226,7 +349,29 @@ struct TodoListView: View {
                         .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
                         .listRowSeparator(.hidden)
                         .listRowBackground(Color.clear)
+                        // 左滑操作
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            // 删除按钮（红色）
+                            Button(role: .destructive) {
+                                todoToDelete = todo
+                                showDeleteConfirm = true
+                            } label: {
+                                Label("删除", systemImage: "trash")
+                            }
+                            .tint(.red)
+                            
+                            // 添加子任务按钮（蓝色）
+                            Button {
+                                todoForSubtask = todo
+                                showAddSubtaskSheet = true
+                            } label: {
+                                Label("子任务", systemImage: "checklist")
+                            }
+                            .tint(.blue)
+                        }
                         .onTapGesture {
+                            // 隐藏键盘并打开详情
+                            isQuickAddFocused = false
                             selectedTodoItem = SelectedTodoItem(todo: todo, index: globalIndex)
                         }
                     }
@@ -266,10 +411,18 @@ struct TodoListView: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .background(Color(.systemGroupedBackground))
+        .scrollDismissesKeyboard(.interactively) // iOS 16+: 滚动时自动隐藏键盘
         .refreshable {
             await todoViewModel.refresh()
             await categoryViewModel.refresh()
         }
+        .simultaneousGesture(
+            // 监听滚动开始，隐藏键盘
+            DragGesture(minimumDistance: 10)
+                .onChanged { _ in
+                    isQuickAddFocused = false
+                }
+        )
     }
 
     /// 计算 todo 在全局 filteredTodos 中的索引
@@ -468,6 +621,86 @@ struct TodoListView: View {
             }
         }
     }
+
+    /// 悬浮麦克风按钮
+    private var floatingMicButton: some View {
+        Button(action: {
+            toggleSpeechRecognition()
+        }) {
+            ZStack {
+                // 背景阴影
+                Circle()
+                    .fill(Color(.systemBackground))
+                    .frame(width: 60, height: 60)
+                    .shadow(color: Color.black.opacity(0.2), radius: 8, x: 0, y: 4)
+
+                // 录音中的脉动光晕
+                if speechRecognizer.isRecording {
+                    Circle()
+                        .fill(Color.red.opacity(0.2))
+                        .frame(width: 56, height: 56)
+                        .scaleEffect(speechRecognizer.isRecording ? 1.3 : 1.0)
+                        .opacity(speechRecognizer.isRecording ? 0.5 : 1.0)
+                        .animation(
+                            .easeInOut(duration: 0.8)
+                            .repeatForever(autoreverses: true),
+                            value: speechRecognizer.isRecording
+                        )
+                }
+
+                // 麦克风图标
+                Image(systemName: "mic.circle.fill")
+                    .font(.system(size: 56))
+                    .foregroundColor(speechRecognizer.isRecording ? .red : .orange)
+            }
+        }
+    }
+
+    /// 切换语音识别状态
+    private func toggleSpeechRecognition() {
+        // 触觉反馈
+        #if os(iOS)
+        let impact = UIImpactFeedbackGenerator(style: .medium)
+        impact.impactOccurred()
+        #endif
+
+        if speechRecognizer.isRecording {
+            // 停止录音
+            speechRecognizer.stopRecording()
+        } else {
+            // 开始录音
+            startSpeechRecognition()
+        }
+    }
+
+    /// 开始语音识别
+    private func startSpeechRecognition() {
+        Task {
+            // 请求权限
+            let granted = await speechRecognizer.requestPermission()
+
+            guard granted else {
+                // TODO: 显示权限提示
+                return
+            }
+
+            // 开始录音
+            do {
+                try speechRecognizer.startRecording { recognizedText in
+                    // 语音识别的文字会通过 speechRecognizer.recognizedText 自动更新
+                    // QuickAddTodoView 会监听这个变化
+                }
+            } catch {
+                // TODO: 显示错误提示
+                print("启动语音识别失败: \(error)")
+            }
+        }
+    }
+
+    /// 限制位置在指定范围内
+    private func clampPosition(value: CGFloat, min: CGFloat, max: CGFloat) -> CGFloat {
+        return Swift.min(Swift.max(value, min), max)
+    }
 }
 
 // MARK: - 辅助组件
@@ -527,22 +760,9 @@ struct FilterStatusChip: View {
 }
 
 // MARK: - 预览
+// Preview已移除 - 直接运行应用查看效果
 
-#Preview("Empty State") {
-    // Create a mock user for preview
-    let authViewModel = AuthViewModel()
-    let mockUser = User(
-        username: "预览用户",
-        phoneNumber: "13800138000",
-        email: "preview@example.com"
-    )
-    authViewModel.currentUser = mockUser
-    
-    return TodoListView(authViewModel: authViewModel)
-        .environment(authViewModel)
-        .modelContainer(DataManager.shared.container)
-}
-
+/*
 #Preview("With Sample Data") {
     // Use DataManager's shared container so TodoViewModel can load the data
     let context = DataManager.shared.context
@@ -715,21 +935,62 @@ struct FilterStatusChip: View {
     let authViewModel = AuthViewModel()
     authViewModel.currentUser = mockUser
     
-    return TodoListView(authViewModel: authViewModel)
+    // Demo: QuickAddTodoView with natural language input
+    // Shows how the parser handles: "下周一下午3点开会，高优先级，添加到工作分类"
+    TodoListView(authViewModel: authViewModel)
         .environment(authViewModel)
         .modelContainer(DataManager.shared.container)
 }
+*/
 
-#Preview("Loading State") {
-    let authViewModel = AuthViewModel()
-    let mockUser = User(
-        username: "预览用户",
-        phoneNumber: "13800138000",
-        email: "preview@example.com"
-    )
-    authViewModel.currentUser = mockUser
-    
-    return TodoListView(authViewModel: authViewModel)
-        .environment(authViewModel)
-        .modelContainer(DataManager.shared.container)
+// MARK: - 添加子任务弹窗
+
+struct AddSubtaskSheet: View {
+    let todoTitle: String
+    @Binding var newSubtaskTitle: String
+    let onAdd: () -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 20) {
+                // 提示文本
+                Text("为「\(todoTitle)」添加子任务")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                    .padding(.top)
+
+                // 输入框
+                TextField("输入子任务标题", text: $newSubtaskTitle)
+                    .padding()
+                    .background(Color(.secondarySystemGroupedBackground))
+                    .cornerRadius(10)
+                    .padding(.horizontal)
+                    .onSubmit {
+                        if !newSubtaskTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            onAdd()
+                        }
+                    }
+
+                Spacer()
+            }
+            .background(Color(.systemGroupedBackground))
+            .navigationTitle("添加子任务")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") {
+                        onCancel()
+                    }
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("添加") {
+                        onAdd()
+                    }
+                    .disabled(newSubtaskTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+        }
+    }
 }

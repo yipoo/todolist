@@ -397,8 +397,10 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "需要访问相机以拍摄头像照片";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "需要使用麦克风输入待办事项";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "需要访问相册以保存照片";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "需要访问相册以选择头像照片";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "需要使用语音识别功能";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -445,8 +447,10 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "需要访问相机以拍摄头像照片";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "需要使用麦克风输入待办事项";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "需要访问相册以保存照片";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "需要访问相册以选择头像照片";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "需要使用语音识别功能";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;

@@ -17,9 +17,6 @@ struct TodoRow: View {
 
     // MARK: - 状态
 
-    @State private var showDeleteConfirm = false
-    @State private var showAddSubtaskSheet = false
-    @State private var newSubtaskTitle = ""
     @Environment(\.colorScheme) private var colorScheme
 
     // MARK: - 计算属性
@@ -62,50 +59,6 @@ struct TodoRow: View {
         .background(cardBackgroundColor)
         .cornerRadius(Layout.mediumCornerRadius)
         .shadow(color: Color.black.opacity(0.1), radius: 3, x: 0, y: 1)
-        // 删除确认
-        .confirmationDialog("确定删除这个待办？", isPresented: $showDeleteConfirm) {
-            Button("删除", role: .destructive) {
-                onDelete()
-            }
-            Button("取消", role: .cancel) {}
-        }
-        // 左滑操作
-        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-            // 删除按钮
-            Button(role: .destructive) {
-                showDeleteConfirm = true
-            } label: {
-                Label("删除", systemImage: "trash")
-            }
-
-            // 添加子任务按钮
-            Button {
-                showAddSubtaskSheet = true
-            } label: {
-                Label("子任务", systemImage: "checklist")
-            }
-            .tint(.blue)
-        }
-        // 添加子任务弹窗
-        .sheet(isPresented: $showAddSubtaskSheet) {
-            AddSubtaskSheet(
-                todoTitle: todo.title,
-                newSubtaskTitle: $newSubtaskTitle,
-                onAdd: {
-                    let trimmed = newSubtaskTitle.trimmed
-                    if !trimmed.isEmpty {
-                        onAddSubtask?(trimmed)
-                    }
-                    showAddSubtaskSheet = false
-                    newSubtaskTitle = ""
-                },
-                onCancel: {
-                    showAddSubtaskSheet = false
-                    newSubtaskTitle = ""
-                }
-            )
-            .presentationDetents([.height(300)])
-        }
         // 完成状态样式
         .opacity(todo.isCompleted ? 0.6 : 1.0)
     }
@@ -232,58 +185,6 @@ struct TodoRow: View {
                             .font(.caption2)
                             .foregroundColor(.secondary)
                     }
-                }
-            }
-        }
-    }
-}
-
-// MARK: - 添加子任务弹窗
-
-struct AddSubtaskSheet: View {
-    let todoTitle: String
-    @Binding var newSubtaskTitle: String
-    let onAdd: () -> Void
-    let onCancel: () -> Void
-
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 20) {
-                // 提示文本
-                Text("为「\(todoTitle)」添加子任务")
-                    .font(.headline)
-                    .foregroundColor(.primary)
-                    .padding(.top)
-
-                // 输入框
-                TextField("输入子任务标题", text: $newSubtaskTitle)
-                    .padding()
-                    .background(Color(.secondarySystemGroupedBackground))
-                    .cornerRadius(10)
-                    .padding(.horizontal)
-                    .onSubmit {
-                        if !newSubtaskTitle.trimmed.isEmpty {
-                            onAdd()
-                        }
-                    }
-
-                Spacer()
-            }
-            .background(Color(.systemGroupedBackground))
-            .navigationTitle("添加子任务")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") {
-                        onCancel()
-                    }
-                }
-
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("添加") {
-                        onAdd()
-                    }
-                    .disabled(newSubtaskTitle.trimmed.isEmpty)
                 }
             }
         }
