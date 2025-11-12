@@ -14,6 +14,7 @@ struct PreferencesView: View {
     @State private var selectedTheme: AppTheme = .system
     @State private var selectedView: DefaultView = .list
     @State private var autoArchive = false
+    @State private var showRecurringTasks = true
     @State private var showToast = false
     @State private var toastMessage = ""
     @State private var isInitialLoad = true  // 标记是否是初次加载
@@ -64,10 +65,15 @@ struct PreferencesView: View {
                         .onChange(of: autoArchive) { _, newValue in
                             preferences.autoArchive = newValue
                         }
+
+                    Toggle("显示自律打卡", isOn: $showRecurringTasks)
+                        .onChange(of: showRecurringTasks) { _, newValue in
+                            preferences.showRecurringTasks = newValue
+                        }
                 } header: {
                     Text("任务管理")
                 } footer: {
-                    Text("完成超过30天的任务将自动归档")
+                    Text("完成超过30天的任务将自动归档。自律打卡用于记录习惯养成任务")
                 }
 
                 // 重置设置
@@ -113,6 +119,7 @@ struct PreferencesView: View {
         selectedTheme = preferences.theme
         selectedView = preferences.defaultView
         autoArchive = preferences.autoArchive
+        showRecurringTasks = preferences.showRecurringTasks
 
         // 使用 DispatchQueue 确保在下一个 runloop 中将标志位设为 false
         // 这样可以确保 onChange 不会在初次加载时触发

@@ -183,10 +183,10 @@ final class NaturalLanguageParser {
             cleanText = cleanText.replacingOccurrences(of: matchedText, with: "")
         }
 
-        // 3. 如果有日期，尝试提取时间（早上、下午、晚上、具体时间）
-        if let date = resultDate {
-            if let (timeComponents, matchedTimeText) = extractTime(from: text) {
-                // 合并日期和时间
+        // 3. 尝试提取时间（早上、下午、晚上、具体时间）
+        if let (timeComponents, matchedTimeText) = extractTime(from: text) {
+            if let date = resultDate {
+                // 有日期：合并日期和时间
                 let dateComponents = calendar.dateComponents([.year, .month, .day], from: date)
                 var combined = DateComponents()
                 combined.year = dateComponents.year
@@ -201,18 +201,40 @@ final class NaturalLanguageParser {
                     cleanText = cleanText.replacingOccurrences(of: matchedTimeText, with: "")
                 }
             } else {
-                // 没有具体时间，默认设置为9:00
-                let dateComponents = calendar.dateComponents([.year, .month, .day], from: date)
-                var combined = DateComponents()
-                combined.year = dateComponents.year
-                combined.month = dateComponents.month
-                combined.day = dateComponents.day
-                combined.hour = 9
-                combined.minute = 0
+                // 没有日期：根据当前时间判断是今天还是明天
+                var targetDateComponents = calendar.dateComponents([.year, .month, .day], from: now)
+                targetDateComponents.hour = timeComponents.hour
+                targetDateComponents.minute = timeComponents.minute
 
-                if let combinedDate = calendar.date(from: combined) {
-                    resultDate = combinedDate
+                if let targetDate = calendar.date(from: targetDateComponents) {
+                    // 如果目标时间已经过去，则设置为明天
+                    if targetDate <= now {
+                        if let tomorrow = calendar.date(byAdding: .day, value: 1, to: targetDate) {
+                            resultDate = tomorrow
+                            timeText = "明天 " + matchedTimeText
+                        } else {
+                            resultDate = targetDate
+                            timeText = matchedTimeText
+                        }
+                    } else {
+                        resultDate = targetDate
+                        timeText = "今天 " + matchedTimeText
+                    }
+                    cleanText = cleanText.replacingOccurrences(of: matchedTimeText, with: "")
                 }
+            }
+        } else if let date = resultDate {
+            // 有日期但没有具体时间，默认设置为9:00
+            let dateComponents = calendar.dateComponents([.year, .month, .day], from: date)
+            var combined = DateComponents()
+            combined.year = dateComponents.year
+            combined.month = dateComponents.month
+            combined.day = dateComponents.day
+            combined.hour = 9
+            combined.minute = 0
+
+            if let combinedDate = calendar.date(from: combined) {
+                resultDate = combinedDate
             }
         }
 

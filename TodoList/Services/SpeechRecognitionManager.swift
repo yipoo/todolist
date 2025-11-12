@@ -147,7 +147,7 @@ final class SpeechRecognitionManager: NSObject {
             guard let self = self else { return }
 
             var isFinal = false
-1
+
             if let result = result {
                 // 更新识别到的文本
                 Task { @MainActor in

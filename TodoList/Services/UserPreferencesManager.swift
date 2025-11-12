@@ -22,6 +22,7 @@ final class UserPreferencesManager {
         static let dailyReminder = "notifications.dailyReminder"
         static let reminderTime = "notifications.reminderTime"
         static let autoArchive = "tasks.autoArchive"
+        static let showRecurringTasks = "tasks.showRecurringTasks"
     }
 
     // MARK: - 属性
@@ -75,6 +76,13 @@ final class UserPreferencesManager {
         }
     }
 
+    /// 显示循环任务
+    var showRecurringTasks: Bool {
+        didSet {
+            UserDefaults.standard.set(showRecurringTasks, forKey: Keys.showRecurringTasks)
+        }
+    }
+
     // MARK: - 初始化
 
     private init() {
@@ -107,6 +115,7 @@ final class UserPreferencesManager {
         }
 
         self.autoArchive = UserDefaults.standard.object(forKey: Keys.autoArchive) as? Bool ?? false
+        self.showRecurringTasks = UserDefaults.standard.object(forKey: Keys.showRecurringTasks) as? Bool ?? true
     }
 
     // MARK: - 重置方法
@@ -119,6 +128,7 @@ final class UserPreferencesManager {
         dueReminder = true
         dailyReminder = false
         autoArchive = false
+        showRecurringTasks = true
 
         let calendar = Calendar.current
         let components = DateComponents(hour: 9, minute: 0)

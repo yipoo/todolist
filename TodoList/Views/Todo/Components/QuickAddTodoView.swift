@@ -437,7 +437,6 @@ struct QuickAddTodoView: View {
     /// 格式化日期显示
     private func formatDate(_ date: Date) -> String {
         let calendar = Calendar.current
-        let now = Date()
 
         if calendar.isDateInToday(date) {
             let formatter = DateFormatter()

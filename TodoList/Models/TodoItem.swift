@@ -50,6 +50,39 @@ final class TodoItem {
     /// 预计需要的番茄钟数量
     var estimatedPomodoros: Int = 0
 
+    // MARK: - 循环任务属性
+
+    /// 是否是循环任务
+    var isRecurring: Bool = false
+
+    /// 循环任务的颜色(十六进制字符串,如 "#FF5733")
+    var recurringColor: String?
+
+    /// 循环任务的图标名称
+    var recurringIcon: String?
+
+    /// 循环类型(使用字符串存储)
+    var recurringTypeRaw: String = "none"
+
+    /// 自定义循环的星期(1-7,周一到周日)
+    var customWeekdays: [Int] = []
+
+    /// 循环任务的打卡记录(日期字符串数组,格式: yyyy-MM-dd)
+    var checkInDates: [String] = []
+
+    /// 循环任务的连续打卡天数
+    var streakDays: Int = 0
+
+    /// 循环类型(计算属性)
+    var recurringType: RecurringType {
+        get {
+            RecurringType(rawValue: recurringTypeRaw) ?? .none
+        }
+        set {
+            recurringTypeRaw = newValue.rawValue
+        }
+    }
+
     // MARK: - 关系
 
     /// 所属用户（多对一）
@@ -143,6 +176,147 @@ final class TodoItem {
     func subtaskProgressText() -> String {
         let completed = subtasks.filter { $0.isCompleted }.count
         return "\(completed)/\(subtasks.count)"
+    }
+
+    // MARK: - 循环任务方法
+
+    /// 判断今天是否需要打卡
+    func shouldCheckInToday() -> Bool {
+        guard isRecurring else { return false }
+
+        let today = Date()
+        let calendar = Calendar.current
+        let weekday = calendar.component(.weekday, from: today) // 1=周日, 2=周一, ..., 7=周六
+
+        switch recurringType {
+        case .none:
+            return false
+        case .daily:
+            return true
+        case .weekdays:
+            // 周一到周五 (2-6)
+            return weekday >= 2 && weekday <= 6
+        case .custom:
+            // 转换为周一=1的格式
+            let adjustedWeekday = weekday == 1 ? 7 : weekday - 1
+            return customWeekdays.contains(adjustedWeekday)
+        }
+    }
+
+    /// 判断今天是否已打卡
+    func isCheckedInToday() -> Bool {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        let todayString = dateFormatter.string(from: Date())
+        return checkInDates.contains(todayString)
+    }
+
+    /// 今日打卡
+    func checkInToday() {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        let todayString = dateFormatter.string(from: Date())
+
+        if !checkInDates.contains(todayString) {
+            checkInDates.append(todayString)
+            updateStreakDays()
+            updatedAt = Date()
+        }
+    }
+
+    /// 取消今日打卡
+    func uncheckToday() {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        let todayString = dateFormatter.string(from: Date())
+
+        if let index = checkInDates.firstIndex(of: todayString) {
+            checkInDates.remove(at: index)
+            updateStreakDays()
+            updatedAt = Date()
+        }
+    }
+
+    /// 更新连续打卡天数
+    private func updateStreakDays() {
+        guard !checkInDates.isEmpty else {
+            streakDays = 0
+            return
+        }
+
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+
+        // 按日期排序
+        let sortedDates = checkInDates.compactMap { dateFormatter.date(from: $0) }.sorted()
+
+        guard !sortedDates.isEmpty else {
+            streakDays = 0
+            return
+        }
+
+        let calendar = Calendar.current
+        var streak = 1
+        var currentDate = sortedDates.last!
+
+        // 从最后一天往前数
+        for i in stride(from: sortedDates.count - 2, through: 0, by: -1) {
+            let previousDate = sortedDates[i]
+            let daysDifference = calendar.dateComponents([.day], from: previousDate, to: currentDate).day ?? 0
+
+            if daysDifference == 1 {
+                streak += 1
+                currentDate = previousDate
+            } else {
+                break
+            }
+        }
+
+        streakDays = streak
+    }
+
+    /// 获取本周打卡天数
+    func thisWeekCheckInCount() -> Int {
+        let calendar = Calendar.current
+        let today = Date()
+        guard let weekStart = calendar.dateInterval(of: .weekOfYear, for: today)?.start else {
+            return 0
+        }
+
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+
+        return checkInDates.filter { dateString in
+            guard let date = dateFormatter.date(from: dateString) else { return false }
+            return date >= weekStart && date <= today
+        }.count
+    }
+}
+
+// MARK: - 循环类型枚举
+
+enum RecurringType: String, Codable, CaseIterable {
+    case none = "none"
+    case daily = "daily"
+    case weekdays = "weekdays"
+    case custom = "custom"
+
+    var displayName: String {
+        switch self {
+        case .none: return "不重复"
+        case .daily: return "每天"
+        case .weekdays: return "工作日"
+        case .custom: return "自定义"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .none: return "minus.circle"
+        case .daily: return "repeat"
+        case .weekdays: return "briefcase"
+        case .custom: return "calendar"
+        }
     }
 }
 

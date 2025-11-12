@@ -40,9 +40,9 @@ final class TodoViewModel {
 
     // MARK: - 计算属性
 
-    /// 筛选后的待办列表
+    /// 筛选后的待办列表(排除循环任务)
     var filteredTodos: [TodoItem] {
-        var result = todos
+        var result = todos.filter { !$0.isRecurring }
 
         // 按分类筛选
         if let category = selectedCategory {
@@ -167,6 +167,39 @@ final class TodoViewModel {
     }
 
     // MARK: - 创建和更新
+
+    /// 添加待办(直接传入 TodoItem)
+    func addTodo(_ todo: TodoItem) async {
+        guard let user = authViewModel.currentUser else {
+            errorMessage = "请先登录"
+            return
+        }
+
+        clearMessages()
+        isLoading = true
+
+        // 设置用户
+        todo.user = user
+
+        do {
+            try dataManager.createTodo(todo)
+
+            // 为新创建的待办设置通知(只有非循环任务才设置通知)
+            if !todo.isRecurring {
+                await notificationManager.scheduleNotification(for: todo)
+            }
+
+            // 重新加载列表
+            loadTodos()
+
+            successMessage = "创建成功"
+            isLoading = false
+
+        } catch {
+            errorMessage = "创建失败：\(error.localizedDescription)"
+            isLoading = false
+        }
+    }
 
     /// 创建待办
     func createTodo(

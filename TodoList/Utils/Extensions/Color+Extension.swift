@@ -108,4 +108,45 @@ extension Color {
             opacity: Double(alpha)
         )
     }
+
+    /// 计算颜色的相对亮度 (Relative Luminance)
+    /// 使用 WCAG 2.0 标准公式
+    var luminance: Double {
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        var alpha: CGFloat = 0
+
+        UIColor(self).getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+
+        func adjust(component: CGFloat) -> Double {
+            let value = Double(component)
+            if value <= 0.03928 {
+                return value / 12.92
+            } else {
+                return pow((value + 0.055) / 1.055, 2.4)
+            }
+        }
+
+        let r = adjust(component: red)
+        let g = adjust(component: green)
+        let b = adjust(component: blue)
+
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b
+    }
+
+    /// 判断颜色是否为深色
+    var isDark: Bool {
+        return luminance < 0.5
+    }
+
+    /// 获取与背景形成良好对比的文字颜色
+    var contrastingTextColor: Color {
+        return isDark ? .white : .black
+    }
+
+    /// 获取与背景形成对比的柔和文字颜色
+    var softContrastingTextColor: Color {
+        return isDark ? Color.white.opacity(0.9) : Color.black.opacity(0.85)
+    }
 }

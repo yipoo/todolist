@@ -8,8 +8,8 @@
  * - 快速操作（完成、删除）
  */
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct TodoListView: View {
     // MARK: - 环境
@@ -24,18 +24,21 @@ struct TodoListView: View {
     @State private var showFilterSheet = false
     @State private var selectedTodoItem: SelectedTodoItem?
     @State private var showToast = false
-    @State private var groupByCategory = false // 是否按分类分组
-    @State private var speechRecognizer = SpeechRecognitionManager() // 语音识别管理器
-    @State private var micButtonPosition: CGPoint? = nil // 麦克风按钮的位置（nil = 使用默认位置）
-    @State private var isDraggingMic = false // 是否正在拖拽麦克风
-    @FocusState private var isQuickAddFocused: Bool // QuickAdd输入框焦点状态
-    
+    @State private var groupByCategory = false  // 是否按分类分组
+    @State private var speechRecognizer = SpeechRecognitionManager()  // 语音识别管理器
+    @State private var micButtonPosition: CGPoint? = nil  // 麦克风按钮的位置（nil = 使用默认位置）
+    @State private var isDraggingMic = false  // 是否正在拖拽麦克风
+    @FocusState private var isQuickAddFocused: Bool  // QuickAdd输入框焦点状态
+
     // 左滑操作相关状态
-    @State private var todoToDelete: TodoItem? = nil // 待删除的 todo
-    @State private var showDeleteConfirm = false // 显示删除确认对话框
-    @State private var todoForSubtask: TodoItem? = nil // 要添加子任务的 todo
-    @State private var showAddSubtaskSheet = false // 显示添加子任务弹窗
-    @State private var newSubtaskTitle = "" // 新子任务标题
+    @State private var todoToDelete: TodoItem? = nil  // 待删除的 todo
+    @State private var showDeleteConfirm = false  // 显示删除确认对话框
+    @State private var todoForSubtask: TodoItem? = nil  // 要添加子任务的 todo
+    @State private var showAddSubtaskSheet = false  // 显示添加子任务弹窗
+    @State private var newSubtaskTitle = ""  // 新子任务标题
+    @State private var showCreateRecurringTask = false  // 显示创建循环任务界面
+    @State private var preferences = UserPreferencesManager.shared  // 用户偏好设置
+    @State private var recurringTaskToEdit: TodoItem? = nil  // 要编辑的循环任务
 
     // MARK: - 初始化
 
@@ -49,6 +52,27 @@ struct TodoListView: View {
     /// 是否有激活的筛选或排序
     private var hasActiveFilterOrSort: Bool {
         todoViewModel.currentFilter != .all || todoViewModel.currentSort != .createdAt
+    }
+
+    /// 循环任务列表(只显示今天需要打卡的,已完成的排在最后)
+    private var recurringTodos: [TodoItem] {
+        let todos = todoViewModel.todos.filter { todo in
+            todo.isRecurring && todo.shouldCheckInToday()
+        }
+
+        // 排序: 未完成的在前,已完成的在后
+        return todos.sorted { todo1, todo2 in
+            let checked1 = todo1.isCheckedInToday()
+            let checked2 = todo2.isCheckedInToday()
+
+            // 如果打卡状态不同,未打卡的排在前面
+            if checked1 != checked2 {
+                return !checked1
+            }
+
+            // 如果打卡状态相同,按创建时间排序
+            return todo1.createdAt < todo2.createdAt
+        }
     }
 
     /// 按分类分组的 todos
@@ -182,6 +206,23 @@ struct TodoListView: View {
             .sheet(isPresented: $showFilterSheet) {
                 filterSheet
             }
+            .sheet(isPresented: $showCreateRecurringTask) {
+                CreateRecurringTaskView(
+                    todoViewModel: todoViewModel,
+                    onDismiss: {
+                        showCreateRecurringTask = false
+                    }
+                )
+            }
+            .sheet(item: $recurringTaskToEdit) { todo in
+                EditRecurringTaskSheet(
+                    todo: todo,
+                    todoViewModel: todoViewModel,
+                    onDismiss: {
+                        recurringTaskToEdit = nil
+                    }
+                )
+            }
             // Toast 提示
             .toast(
                 isPresented: $showToast,
@@ -225,7 +266,8 @@ struct TodoListView: View {
                         todoTitle: todo.title,
                         newSubtaskTitle: $newSubtaskTitle,
                         onAdd: {
-                            let trimmed = newSubtaskTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+                            let trimmed = newSubtaskTitle.trimmingCharacters(
+                                in: .whitespacesAndNewlines)
                             if !trimmed.isEmpty {
                                 Task {
                                     await todoViewModel.addSubtask(to: todo, title: trimmed)
@@ -268,9 +310,12 @@ struct TodoListView: View {
     /// 空状态视图
     private var emptyView: some View {
         VStack(spacing: 20) {
-            Image(systemName: todoViewModel.searchText.isEmpty ? "checkmark.circle" : "magnifyingglass")
-                .font(.system(size: 60))
-                .foregroundColor(.gray)
+            Image(
+                systemName: todoViewModel.searchText.isEmpty
+                    ? "checkmark.circle" : "magnifyingglass"
+            )
+            .font(.system(size: 60))
+            .foregroundColor(.gray)
 
             if todoViewModel.searchText.isEmpty {
                 Text("还没有待办事项")
@@ -312,6 +357,85 @@ struct TodoListView: View {
     /// 列表内容
     private var listContent: some View {
         List {
+            // 循环任务区域 (只在设置开启时显示)
+            if preferences.showRecurringTasks {
+                Section {
+                    if recurringTodos.isEmpty {
+                        // 没有循环任务时：显示小的添加按钮
+                        Button(action: {
+                            showCreateRecurringTask = true
+                        }) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.system(size: 18))
+                                Text("添加自律打卡")
+                                    .font(.system(size: 14, weight: .medium))
+                            }
+                            .foregroundColor(.blue)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .background(Color.blue.opacity(0.1))
+                            .cornerRadius(12)
+                        }
+                        .buttonStyle(.plain)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    } else {
+                        // 有循环任务时：横向滚动显示
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 12) {
+                                // 循环任务卡片
+                                ForEach(recurringTodos) { todo in
+                                    RecurringTaskCard(
+                                        todo: todo,
+                                        onToggle: {
+                                            Task {
+                                                if todo.isCheckedInToday() {
+                                                    todo.uncheckToday()
+                                                } else {
+                                                    todo.checkInToday()
+                                                }
+                                                await todoViewModel.updateTodo(todo)
+                                            }
+                                        },
+                                        onEdit: {
+                                            recurringTaskToEdit = todo
+                                        }
+                                    )
+                                }
+
+                                // 添加循环任务按钮（与卡片同样大小）
+                                Button(action: {
+                                    showCreateRecurringTask = true
+                                }) {
+                                    VStack(spacing: 12) {
+                                        Image(systemName: "plus.circle.fill")
+                                            .font(.system(size: 40))
+                                            .foregroundColor(.blue)
+                                        Text("添加")
+                                            .font(.system(size: 12, weight: .medium))
+                                            .foregroundColor(.blue)
+                                    }
+                                    .frame(width: 120, height: 120)
+                                    .background(Color.blue.opacity(0.1))
+                                    .cornerRadius(16)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .stroke(
+                                                Color.blue.opacity(0.3),
+                                                style: StrokeStyle(lineWidth: 1.5, dash: [5]))
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            .padding(.horizontal, 2)
+                        }
+                    }
+                }
+                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+            }
+
             // 筛选状态栏
             if hasActiveFilterOrSort {
                 Section {
@@ -359,7 +483,7 @@ struct TodoListView: View {
                                 Label("删除", systemImage: "trash")
                             }
                             .tint(.red)
-                            
+
                             // 添加子任务按钮（蓝色）
                             Button {
                                 todoForSubtask = todo
@@ -411,7 +535,7 @@ struct TodoListView: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .background(Color(.systemGroupedBackground))
-        .scrollDismissesKeyboard(.interactively) // iOS 16+: 滚动时自动隐藏键盘
+        .scrollDismissesKeyboard(.interactively)  // iOS 16+: 滚动时自动隐藏键盘
         .refreshable {
             await todoViewModel.refresh()
             await categoryViewModel.refresh()
@@ -514,14 +638,16 @@ struct TodoListView: View {
     private var filterBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 12) {
-                ForEach([
-                    TodoFilterOption.all,
-                    .today,
-                    .week,
-                    .uncompleted,
-                    .completed,
-                    .overdue
-                ], id: \.self) { filter in
+                ForEach(
+                    [
+                        TodoFilterOption.all,
+                        .today,
+                        .week,
+                        .uncompleted,
+                        .completed,
+                        .overdue,
+                    ], id: \.self
+                ) { filter in
                     FilterChip(
                         title: filter.displayName,
                         isSelected: todoViewModel.currentFilter == filter,
@@ -643,7 +769,7 @@ struct TodoListView: View {
                         .opacity(speechRecognizer.isRecording ? 0.5 : 1.0)
                         .animation(
                             .easeInOut(duration: 0.8)
-                            .repeatForever(autoreverses: true),
+                                .repeatForever(autoreverses: true),
                             value: speechRecognizer.isRecording
                         )
                 }
@@ -660,8 +786,8 @@ struct TodoListView: View {
     private func toggleSpeechRecognition() {
         // 触觉反馈
         #if os(iOS)
-        let impact = UIImpactFeedbackGenerator(style: .medium)
-        impact.impactOccurred()
+            let impact = UIImpactFeedbackGenerator(style: .medium)
+            impact.impactOccurred()
         #endif
 
         if speechRecognizer.isRecording {
@@ -759,190 +885,6 @@ struct FilterStatusChip: View {
     }
 }
 
-// MARK: - 预览
-// Preview已移除 - 直接运行应用查看效果
-
-/*
-#Preview("With Sample Data") {
-    // Use DataManager's shared container so TodoViewModel can load the data
-    let context = DataManager.shared.context
-    
-    // Create a mock user for preview
-    let mockUser = User(
-        username: "预览用户",
-        phoneNumber: "13800138000",
-        email: "preview@example.com"
-    )
-    context.insert(mockUser)
-    
-    // Create sample categories
-    let workCategory = Category(
-        name: "工作",
-        icon: "briefcase.fill",
-        colorHex: "#007AFF",
-        sortOrder: 1,
-        user: mockUser
-    )
-    
-    let studyCategory = Category(
-        name: "学习",
-        icon: "book.fill",
-        colorHex: "#FF9500",
-        sortOrder: 2,
-        user: mockUser
-    )
-    
-    let lifeCategory = Category(
-        name: "生活",
-        icon: "house.fill",
-        colorHex: "#34C759",
-        sortOrder: 3,
-        user: mockUser
-    )
-    
-    // Insert categories
-    context.insert(workCategory)
-    context.insert(studyCategory)
-    context.insert(lifeCategory)
-    
-    // Sample todos
-    // 1. High priority, due today
-    let todo1 = TodoItem(
-        title: "完成项目提案",
-        itemDescription: "准备下周一的项目提案演示文稿，包含市场分析和技术方案",
-        priority: .high,
-        tags: ["紧急", "重要"],
-        dueDate: Calendar.current.date(byAdding: .hour, value: 3, to: Date()),
-//        category: workCategory,
-        user: mockUser
-    )
-    todo1.estimatedPomodoros = 4
-    todo1.pomodoroCount = 1
-    
-    // 2. Medium priority, with subtasks
-    let todo2 = TodoItem(
-        title: "学习 SwiftUI 进阶",
-        itemDescription: "掌握 SwiftData、Observation 和现代并发编程",
-        priority: .medium,
-        tags: ["学习", "SwiftUI"],
-        dueDate: Calendar.current.date(byAdding: .day, value: 3, to: Date()),
-        category: studyCategory,
-        user: mockUser
-    )
-    let subtask1 = Subtask(title: "阅读官方文档", isCompleted: true, sortOrder: 1, todo: todo2)
-    let subtask2 = Subtask(title: "完成练习项目", isCompleted: false, sortOrder: 2, todo: todo2)
-    let subtask3 = Subtask(title: "写学习笔记", isCompleted: false, sortOrder: 3, todo: todo2)
-    todo2.subtasks = [subtask1, subtask2, subtask3]
-    
-    // 3. Overdue task
-    let todo3 = TodoItem(
-        title: "缴纳水电费",
-        itemDescription: "本月的水电费账单",
-        priority: .high,
-        tags: ["账单"],
-        dueDate: Calendar.current.date(byAdding: .day, value: -2, to: Date()),
-        category: lifeCategory,
-        user: mockUser
-    )
-    
-    // 4. Low priority, no due date
-    let todo4 = TodoItem(
-        title: "整理书架",
-        itemDescription: "把书架上的书按类别重新整理",
-        priority: .low,
-        tags: ["整理"],
-        dueDate: nil,
-        category: lifeCategory,
-        user: mockUser
-    )
-    
-    // 5. Completed task
-    let todo5 = TodoItem(
-        title: "晨跑 5 公里",
-        itemDescription: "早上在公园完成",
-        isCompleted: true,
-        priority: .medium,
-        tags: ["运动", "健康"],
-        dueDate: Calendar.current.startOfDay(for: Date()),
-        category: lifeCategory,
-        user: mockUser
-    )
-    todo5.completedAt = Date()
-    todo5.pomodoroCount = 1
-    
-    // 6. High priority with pomodoros
-    let todo6 = TodoItem(
-        title: "代码评审",
-        itemDescription: "Review PR #234 和 PR #235 的代码变更",
-        priority: .high,
-        tags: ["代码", "评审"],
-        dueDate: Calendar.current.date(byAdding: .hour, value: 6, to: Date()),
-        category: workCategory,
-        user: mockUser
-    )
-    todo6.estimatedPomodoros = 2
-    
-    // 7. Medium priority, due this week
-    let todo7 = TodoItem(
-        title: "准备团队周会",
-        itemDescription: "整理本周工作进展和下周计划",
-        priority: .medium,
-        tags: ["会议"],
-        dueDate: Calendar.current.date(byAdding: .day, value: 5, to: Date()),
-        category: workCategory,
-        user: mockUser
-    )
-    
-    // 8. Completed task with subtasks
-    let todo8 = TodoItem(
-        title: "购买日用品",
-        itemDescription: "超市采购清单",
-        isCompleted: true,
-        priority: .low,
-        tags: ["购物"],
-        dueDate: Calendar.current.date(byAdding: .day, value: -1, to: Date()),
-        category: lifeCategory,
-        user: mockUser
-    )
-    todo8.completedAt = Calendar.current.date(byAdding: .hour, value: -2, to: Date())
-    let subtask4 = Subtask(title: "卫生纸", isCompleted: true, sortOrder: 1, todo: todo8)
-    let subtask5 = Subtask(title: "洗洁精", isCompleted: true, sortOrder: 2, todo: todo8)
-    let subtask6 = Subtask(title: "水果", isCompleted: true, sortOrder: 3, todo: todo8)
-    todo8.subtasks = [subtask4, subtask5, subtask6]
-    
-    // Insert all todos
-    context.insert(todo1)
-    context.insert(todo2)
-    context.insert(todo3)
-    context.insert(todo4)
-    context.insert(todo5)
-    context.insert(todo6)
-    context.insert(todo7)
-    context.insert(todo8)
-    
-    // Insert subtasks
-    context.insert(subtask1)
-    context.insert(subtask2)
-    context.insert(subtask3)
-    context.insert(subtask4)
-    context.insert(subtask5)
-    context.insert(subtask6)
-    
-    // Save the context
-    try? context.save()
-    
-    // Create AuthViewModel with the mock user
-    let authViewModel = AuthViewModel()
-    authViewModel.currentUser = mockUser
-    
-    // Demo: QuickAddTodoView with natural language input
-    // Shows how the parser handles: "下周一下午3点开会，高优先级，添加到工作分类"
-    TodoListView(authViewModel: authViewModel)
-        .environment(authViewModel)
-        .modelContainer(DataManager.shared.container)
-}
-*/
-
 // MARK: - 添加子任务弹窗
 
 struct AddSubtaskSheet: View {
@@ -967,7 +909,8 @@ struct AddSubtaskSheet: View {
                     .cornerRadius(10)
                     .padding(.horizontal)
                     .onSubmit {
-                        if !newSubtaskTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        if !newSubtaskTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        {
                             onAdd()
                         }
                     }
@@ -988,9 +931,757 @@ struct AddSubtaskSheet: View {
                     Button("添加") {
                         onAdd()
                     }
-                    .disabled(newSubtaskTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(
+                        newSubtaskTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
         }
     }
 }
+
+// MARK: - 编辑循环任务弹窗
+
+struct EditRecurringTaskSheet: View {
+    let todo: TodoItem
+    let todoViewModel: TodoViewModel
+    let onDismiss: () -> Void
+
+    @State private var showDeleteConfirm = false
+    @State private var selectedTab = 0
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                // 自定义标签选择器
+                Picker("", selection: $selectedTab) {
+                    Text("数据")
+                        .font(.system(size: 16, weight: .medium))
+                        .tag(0)
+                    Text("编辑")
+                        .font(.system(size: 16, weight: .medium))
+                        .tag(1)
+                }
+                .pickerStyle(.segmented)
+                .padding()
+
+                // 标签页内容
+                TabView(selection: $selectedTab) {
+                    // 数据统计标签页
+                    statsTabContent
+                        .tag(0)
+
+                    // 编辑标签页
+                    editTabContent
+                        .tag(1)
+                }
+                .tabViewStyle(.page(indexDisplayMode: .never))
+            }
+            .background(Color(.systemGroupedBackground))
+            .navigationTitle("自律打卡")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("完成") {
+                        onDismiss()
+                    }
+                }
+            }
+            .alert("确定删除？", isPresented: $showDeleteConfirm) {
+                Button("删除", role: .destructive) {
+                    Task {
+                        await todoViewModel.deleteTodo(todo)
+                        onDismiss()
+                    }
+                }
+                Button("取消", role: .cancel) {}
+            } message: {
+                Text("删除后将无法恢复，所有打卡记录也会被清除")
+            }
+        }
+    }
+
+    // 编辑标签页内容
+    private var editTabContent: some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                // 任务卡片预览
+                taskPreviewCard
+
+                // 基本信息
+                basicInfoSection
+
+                // 删除按钮
+                deleteButton
+            }
+            .padding()
+        }
+    }
+
+    // 数据统计标签页内容
+    private var statsTabContent: some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                // 统计卡片网格（6个卡片，2列布局）
+                statsCardsGrid
+
+                // 本月完成率
+                completionRateCard
+
+                // 打卡历史日历
+                calendarHeatmapCard
+            }
+            .padding()
+        }
+    }
+
+    // 统计卡片网格（2列布局）
+    private var statsCardsGrid: some View {
+        let columns = [
+            GridItem(.flexible(), spacing: 12),
+            GridItem(.flexible(), spacing: 12)
+        ]
+
+        return LazyVGrid(columns: columns, spacing: 12) {
+            // 任务卡预览
+            RecurringTaskPreviewCard(todo: todo)
+
+            // 总打卡
+            StatsSquareCard(
+                icon: "checkmark.circle.fill",
+                title: "总打卡",
+                value: "\(todo.checkInDates.count)",
+                unit: "次",
+                color: .green
+            )
+
+            // 连续打卡天数
+            StatsSquareCard(
+                icon: "flame.fill",
+                title: "连续打卡",
+                value: "\(todo.streakDays)",
+                unit: "天",
+                color: .orange
+            )
+
+            // 本周打卡
+            StatsSquareCard(
+                icon: "calendar",
+                title: "本周打卡",
+                value: "\(todo.thisWeekCheckInCount())",
+                unit: "次",
+                color: .blue
+            )
+
+            // 本月打卡
+            StatsSquareCard(
+                icon: "calendar.badge.clock",
+                title: "本月打卡",
+                value: "\(thisMonthCheckInCount())",
+                unit: "次",
+                color: .purple
+            )
+
+            // 本年打卡
+            StatsSquareCard(
+                icon: "calendar.circle.fill",
+                title: "本年打卡",
+                value: "\(thisYearCheckInCount())",
+                unit: "次",
+                color: .pink
+            )
+        }
+    }
+
+    // 本月完成率卡片
+    private var completionRateCard: some View {
+        VStack(spacing: 8) {
+            HStack {
+                Image(systemName: "chart.bar.fill")
+                    .foregroundColor(Color(hex: todo.recurringColor ?? "#4A90E2"))
+                Text("本月完成率")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                Spacer()
+                Text("\(Int(monthCompletionRate() * 100))%")
+                    .font(.headline)
+                    .foregroundColor(Color(hex: todo.recurringColor ?? "#4A90E2"))
+            }
+
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    // 背景
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color(hex: todo.recurringColor ?? "#4A90E2").opacity(0.2))
+                        .frame(height: 8)
+
+                    // 进度
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color(hex: todo.recurringColor ?? "#4A90E2"))
+                        .frame(
+                            width: geometry.size.width * monthCompletionRate(),
+                            height: 8
+                        )
+                }
+            }
+            .frame(height: 8)
+        }
+        .padding()
+        .background(Color(.secondarySystemGroupedBackground))
+        .cornerRadius(12)
+    }
+
+    // 打卡历史日历卡片
+    private var calendarHeatmapCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("打卡历史")
+                    .font(.headline)
+                Spacer()
+            }
+
+            CalendarHeatmapView(
+                checkInDates: todo.checkInDates,
+                baseColor: Color(hex: todo.recurringColor ?? "#4A90E2")
+            )
+        }
+        .padding()
+        .background(Color(.secondarySystemGroupedBackground))
+        .cornerRadius(12)
+    }
+
+    // 本月完成率计算
+    private func monthCompletionRate() -> Double {
+        let calendar = Calendar.current
+        let today = Date()
+        guard let monthStart = calendar.dateInterval(of: .month, for: today)?.start else {
+            return 0
+        }
+
+        // 计算本月应该打卡的天数
+        var expectedDays = 0
+        var currentDate = monthStart
+
+        while currentDate <= today {
+            // 根据循环类型判断今天是否应该打卡
+            let weekday = calendar.component(.weekday, from: currentDate)
+
+            let shouldCheckIn: Bool
+            switch todo.recurringType {
+            case .none:
+                shouldCheckIn = false
+            case .daily:
+                shouldCheckIn = true
+            case .weekdays:
+                shouldCheckIn = weekday >= 2 && weekday <= 6
+            case .custom:
+                let adjustedWeekday = weekday == 1 ? 7 : weekday - 1
+                shouldCheckIn = todo.customWeekdays.contains(adjustedWeekday)
+            }
+
+            if shouldCheckIn {
+                expectedDays += 1
+            }
+
+            currentDate = calendar.date(byAdding: .day, value: 1, to: currentDate)!
+        }
+
+        guard expectedDays > 0 else { return 0 }
+
+        let actualDays = thisMonthCheckInCount()
+        return Double(actualDays) / Double(expectedDays)
+    }
+
+    // 本月打卡次数
+    private func thisMonthCheckInCount() -> Int {
+        let calendar = Calendar.current
+        let today = Date()
+        guard let monthStart = calendar.dateInterval(of: .month, for: today)?.start else {
+            return 0
+        }
+
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+
+        return todo.checkInDates.filter { dateString in
+            guard let date = dateFormatter.date(from: dateString) else { return false }
+            return date >= monthStart && date <= today
+        }.count
+    }
+
+    // 本年打卡次数
+    private func thisYearCheckInCount() -> Int {
+        let calendar = Calendar.current
+        let today = Date()
+        guard let yearStart = calendar.dateInterval(of: .year, for: today)?.start else {
+            return 0
+        }
+
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+
+        return todo.checkInDates.filter { dateString in
+            guard let date = dateFormatter.date(from: dateString) else { return false }
+            return date >= yearStart && date <= today
+        }.count
+    }
+
+    // 任务卡片预览
+    private var taskPreviewCard: some View {
+        VStack(spacing: 12) {
+            Text("任务卡片预览")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            RecurringTaskCard(
+                todo: todo,
+                onToggle: {}
+            )
+            .frame(width: 120, height: 120)
+            .frame(maxWidth: .infinity)
+        }
+        .padding()
+        .background(Color(.secondarySystemGroupedBackground))
+        .cornerRadius(12)
+    }
+
+    // 基本信息区域
+    private var basicInfoSection: some View {
+        VStack(spacing: 12) {
+            SelfDisciplineInfoRow(
+                icon: "text.alignleft",
+                title: "任务名称",
+                value: todo.title,
+                color: .blue
+            )
+
+            SelfDisciplineInfoRow(
+                icon: "repeat",
+                title: "循环方式",
+                value: todo.recurringType.displayName,
+                color: .green
+            )
+
+            if todo.recurringType == .custom {
+                SelfDisciplineInfoRow(
+                    icon: "calendar",
+                    title: "自定义星期",
+                    value: customWeekdaysText(),
+                    color: .orange
+                )
+            }
+        }
+        .padding()
+        .background(Color(.secondarySystemGroupedBackground))
+        .cornerRadius(12)
+    }
+
+    // 删除按钮
+    private var deleteButton: some View {
+        Button(role: .destructive) {
+            showDeleteConfirm = true
+        } label: {
+            HStack {
+                Image(systemName: "trash")
+                Text("删除任务")
+            }
+            .frame(maxWidth: .infinity)
+            .padding()
+            .background(Color.red.opacity(0.1))
+            .foregroundColor(.red)
+            .cornerRadius(12)
+        }
+    }
+
+    // 自定义星期文本
+    private func customWeekdaysText() -> String {
+        let weekdayNames = ["一", "二", "三", "四", "五", "六", "日"]
+        let selectedNames: [String] = todo.customWeekdays.sorted().compactMap { day -> String? in
+            guard day >= 1 && day <= 7 else { return nil }
+            return "周\(weekdayNames[day - 1])"
+        }
+        return selectedNames.joined(separator: "、")
+    }
+}
+
+// MARK: - 信息行组件
+
+struct SelfDisciplineInfoRow: View {
+    let icon: String
+    let title: String
+    let value: String
+    let color: Color
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 16))
+                .foregroundColor(color)
+                .frame(width: 24)
+
+            Text(title)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+
+            Spacer()
+
+            Text(value)
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .foregroundColor(.primary)
+        }
+    }
+}
+
+// MARK: - 任务卡预览卡片（正方形样式）
+
+struct RecurringTaskPreviewCard: View {
+    let todo: TodoItem
+
+    var body: some View {
+        GeometryReader { geometry in
+            RecurringTaskCard(
+                todo: todo,
+                onToggle: {}
+            )
+            .frame(width: 120, height: 120)
+            .scaleEffect(min((geometry.size.width - 24) / 120, (geometry.size.height - 24) / 120))
+            .frame(width: geometry.size.width, height: geometry.size.height)
+        }
+        .aspectRatio(1, contentMode: .fit)
+        .background(Color(.secondarySystemGroupedBackground))
+        .cornerRadius(12)
+    }
+}
+
+// MARK: - 统计正方形卡片
+
+struct StatsSquareCard: View {
+    let icon: String
+    let title: String
+    let value: String
+    let unit: String
+    let color: Color
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 32))
+                .foregroundColor(color)
+
+            VStack(spacing: 4) {
+                Text(value)
+                    .font(.system(size: 28, weight: .bold))
+                    .foregroundColor(.primary)
+
+                HStack(spacing: 2) {
+                    Text(title)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    if !unit.isEmpty {
+                        Text("(\(unit))")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .aspectRatio(1, contentMode: .fit)
+        .background(Color(.secondarySystemGroupedBackground))
+        .cornerRadius(12)
+    }
+}
+
+
+// MARK: - 预览
+// MARK: - Previews
+#Preview("test") {
+//    just show a text
+    Text("test")
+        .font(.system(size: 16, weight: .medium))
+        .foregroundColor(.primary)
+        .frame(maxWidth: .infinity)
+        .frame(maxHeight: .infinity)
+        .background(Color(.systemGroupedBackground))
+        .cornerRadius(12)
+}
+
+// 预览1: 循环任务统计页面
+//#Preview("循环任务统计") {
+//    @Previewable @State var authViewModel = AuthViewModel()
+//    
+//    let mockUser = User(name: "测试用户", email: "test@example.com")
+//    authViewModel.currentUser = mockUser
+//
+//    // 创建循环任务示例
+//    let todo = TodoItem(title: "早起打卡")
+//    todo.isRecurring = true
+//    todo.recurringType = .daily
+//    todo.recurringColor = "#FF6B6B"
+//    todo.recurringIcon = "sun.max.fill"
+//    todo.streakDays = 15
+//
+//    // 生成打卡历史数据
+//    let dateFormatter = DateFormatter()
+//    dateFormatter.dateFormat = "yyyy-MM-dd"
+//    var dates: [String] = []
+//    for day in 0..<45 {
+//        if day % 3 != 0 { // 模拟打卡模式
+//            if let date = Calendar.current.date(byAdding: .day, value: -day, to: Date()) {
+//                dates.append(dateFormatter.string(from: date))
+//            }
+//        }
+//    }
+//    todo.checkInDates = dates
+//
+//    EditRecurringTaskSheet(
+//        todo: todo,
+//        todoViewModel: TodoViewModel(authViewModel: authViewModel),
+//        onDismiss: {}
+//    )
+//}
+
+// 预览2: 循环任务卡片
+// #Preview("循环任务卡片") {
+//     let todo1 = TodoItem(title: "早起打卡")
+//     todo1.isRecurring = true
+//     todo1.recurringColor = "#FF6B6B"
+//     todo1.recurringIcon = "sun.max.fill"
+//     todo1.streakDays = 15
+
+//     let dateFormatter = DateFormatter()
+//     dateFormatter.dateFormat = "yyyy-MM-dd"
+//     let todayString = dateFormatter.string(from: Date())
+//     todo1.checkInDates = [todayString]
+
+//     let todo2 = TodoItem(title: "健身打卡")
+//     todo2.isRecurring = true
+//     todo2.recurringColor = "#4ECDC4"
+//     todo2.recurringIcon = "figure.run"
+//     todo2.streakDays = 7
+
+//     return VStack(spacing: 20) {
+//         HStack(spacing: 12) {
+//             RecurringTaskCard(todo: todo1) {}
+//             RecurringTaskCard(todo: todo2) {}
+//         }
+//     }
+//     .padding()
+// }
+
+// 预览4: 日历热力图
+//#Preview("日历热力图") {
+//    let dateFormatter = DateFormatter()
+//    dateFormatter.dateFormat = "yyyy-MM-dd"
+//
+//    var sampleDates: [String] = []
+//    for day in 0..<60 {
+//        if day % 3 != 0 {
+//            if let date = Calendar.current.date(byAdding: .day, value: -day, to: Date()) {
+//                sampleDates.append(dateFormatter.string(from: date))
+//            }
+//        }
+//    }
+//
+//    return ScrollView {
+//        VStack(spacing: 20) {
+//            CalendarHeatmapView(
+//                checkInDates: sampleDates,
+//                baseColor: .blue
+//            )
+//            .padding()
+//            .background(Color(.secondarySystemGroupedBackground))
+//            .cornerRadius(12)
+//        }
+//        .padding()
+//    }
+//}
+
+// 原始完整预览（已注释 - 太复杂容易超时）
+/*
+#Preview("With Sample Data") {
+    // Use an immediately-invoked closure to setup preview data and return the view
+    {
+        // Use DataManager's shared container so TodoViewModel can load the data
+        let context = DataManager.shared.context
+
+        // Create a mock user for preview
+        let mockUser = User(
+            username: "预览用户",
+            phoneNumber: "13800138000",
+            email: "preview@example.com"
+        )
+        context.insert(mockUser)
+
+        // Create sample categories
+        let workCategory = Category(
+            name: "工作",
+            icon: "briefcase.fill",
+            colorHex: "#007AFF",
+            sortOrder: 1,
+            user: mockUser
+        )
+
+        let studyCategory = Category(
+            name: "学习",
+            icon: "book.fill",
+            colorHex: "#FF9500",
+            sortOrder: 2,
+            user: mockUser
+        )
+
+        let lifeCategory = Category(
+            name: "生活",
+            icon: "house.fill",
+            colorHex: "#34C759",
+            sortOrder: 3,
+            user: mockUser
+        )
+
+        // Insert categories
+        context.insert(workCategory)
+        context.insert(studyCategory)
+        context.insert(lifeCategory)
+
+        // Sample todos
+        // 1. High priority, due today
+        let todo1 = TodoItem(
+            title: "完成项目提案",
+            itemDescription: "准备下周一的项目提案演示文稿，包含市场分析和技术方案",
+            priority: .high,
+            tags: ["紧急", "重要"],
+            dueDate: Calendar.current.date(byAdding: .hour, value: 3, to: Date()),
+            //        category: workCategory,
+            user: mockUser
+        )
+        todo1.estimatedPomodoros = 4
+        todo1.pomodoroCount = 1
+
+        // 2. Medium priority, with subtasks
+        let todo2 = TodoItem(
+            title: "学习 SwiftUI 进阶",
+            itemDescription: "掌握 SwiftData、Observation 和现代并发编程",
+            priority: .medium,
+            tags: ["学习", "SwiftUI"],
+            dueDate: Calendar.current.date(byAdding: .day, value: 3, to: Date()),
+            category: studyCategory,
+            user: mockUser
+        )
+        let subtask1 = Subtask(title: "阅读官方文档", isCompleted: true, sortOrder: 1, todo: todo2)
+        let subtask2 = Subtask(title: "完成练习项目", isCompleted: false, sortOrder: 2, todo: todo2)
+        let subtask3 = Subtask(title: "写学习笔记", isCompleted: false, sortOrder: 3, todo: todo2)
+        todo2.subtasks = [subtask1, subtask2, subtask3]
+
+        // 3. Overdue task
+        let todo3 = TodoItem(
+            title: "缴纳水电费",
+            itemDescription: "本月的水电费账单",
+            priority: .high,
+            tags: ["账单"],
+            dueDate: Calendar.current.date(byAdding: .day, value: -2, to: Date()),
+            category: lifeCategory,
+            user: mockUser
+        )
+
+        // 4. Low priority, no due date
+        let todo4 = TodoItem(
+            title: "整理书架",
+            itemDescription: "把书架上的书按类别重新整理",
+            priority: .low,
+            tags: ["整理"],
+            dueDate: nil,
+            category: lifeCategory,
+            user: mockUser
+        )
+
+        // 5. Completed task
+        let todo5 = TodoItem(
+            title: "晨跑 5 公里",
+            itemDescription: "早上在公园完成",
+            isCompleted: true,
+            priority: .medium,
+            tags: ["运动", "健康"],
+            dueDate: Calendar.current.startOfDay(for: Date()),
+            category: lifeCategory,
+            user: mockUser
+        )
+        todo5.completedAt = Date()
+        todo5.pomodoroCount = 1
+
+        // 6. High priority with pomodoros
+        let todo6 = TodoItem(
+            title: "代码评审",
+            itemDescription: "Review PR #234 和 PR #235 的代码变更",
+            priority: .high,
+            tags: ["代码", "评审"],
+            dueDate: Calendar.current.date(byAdding: .hour, value: 6, to: Date()),
+            category: workCategory,
+            user: mockUser
+        )
+        todo6.estimatedPomodoros = 2
+
+        // 7. Medium priority, due this week
+        let todo7 = TodoItem(
+            title: "准备团队周会",
+            itemDescription: "整理本周工作进展和下周计划",
+            priority: .medium,
+            tags: ["会议"],
+            dueDate: Calendar.current.date(byAdding: .day, value: 5, to: Date()),
+            category: workCategory,
+            user: mockUser
+        )
+
+        // 8. Completed task with subtasks
+        let todo8 = TodoItem(
+            title: "购买日用品",
+            itemDescription: "超市采购清单",
+            isCompleted: true,
+            priority: .low,
+            tags: ["购物"],
+            dueDate: Calendar.current.date(byAdding: .day, value: -1, to: Date()),
+            category: lifeCategory,
+            user: mockUser
+        )
+        todo8.completedAt = Calendar.current.date(byAdding: .hour, value: -2, to: Date())
+        let subtask4 = Subtask(title: "卫生纸", isCompleted: true, sortOrder: 1, todo: todo8)
+        let subtask5 = Subtask(title: "洗洁精", isCompleted: true, sortOrder: 2, todo: todo8)
+        let subtask6 = Subtask(title: "水果", isCompleted: true, sortOrder: 3, todo: todo8)
+        todo8.subtasks = [subtask4, subtask5, subtask6]
+
+        // Insert all todos
+        context.insert(todo1)
+        context.insert(todo2)
+        context.insert(todo3)
+        context.insert(todo4)
+        context.insert(todo5)
+        context.insert(todo6)
+        context.insert(todo7)
+        context.insert(todo8)
+
+        // Insert subtasks
+        context.insert(subtask1)
+        context.insert(subtask2)
+        context.insert(subtask3)
+        context.insert(subtask4)
+        context.insert(subtask5)
+        context.insert(subtask6)
+
+        // Save the context
+        try? context.save()
+
+        // Create AuthViewModel with the mock user
+        let authViewModel = AuthViewModel()
+        authViewModel.currentUser = mockUser
+
+        // Demo: QuickAddTodoView with natural language input
+        // Shows how the parser handles: "下周一下午3点开会，高优先级，添加到工作分类"
+        return TodoListView(authViewModel: authViewModel)
+            .environment(authViewModel)
+            .modelContainer(DataManager.shared.container)
+    }()
+}
+*/
+
+

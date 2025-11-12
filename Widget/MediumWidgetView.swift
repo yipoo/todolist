@@ -71,12 +71,14 @@ struct MediumWidgetView: View {
 
     private var todoList: some View {
         VStack(spacing: 8) {
-            ForEach(Array(entry.todayTodos.prefix(4))) { todo in
+            // 今天待办按照未完成，时间最近排序
+            let sortedTodos = entry.todayTodos.sorted { $0.dueDate ?? Date.distantFuture < $1.dueDate ?? Date.distantFuture }
+            ForEach(Array(sortedTodos.prefix(3))) { todo in
                 TodoRowView(todo: todo)
             }
 
-            if entry.todayTodos.count > 4 {
-                Text("还有 \(entry.todayTodos.count - 4) 个待办...")
+            if entry.todayTodos.count > 3 {
+                Text("还有 \(entry.todayTodos.count - 3) 个待办...")
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .frame(maxWidth: .infinity, alignment: .center)
